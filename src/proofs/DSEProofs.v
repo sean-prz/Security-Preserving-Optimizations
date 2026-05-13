@@ -268,6 +268,8 @@ Proof.
   - destruct (VarSet.mem s out) eqn:Hs.
     all: VarSetDecide.fsetdec.
   - VarSetDecide.fsetdec.
+  - destruct (VarSet.mem s out) eqn:Hs.
+    all: VarSetDecide.fsetdec.
   - eapply vsp.subset_trans.
     apply IHc1.
     rewrite IHc2.
@@ -284,7 +286,7 @@ Proof.
 Qed.
 
 
-      (* ================================================================= *)
+(* ================================================================= *)
 (* while_fixpoint properties                                  *)
 (* ================================================================= *)
 
@@ -395,6 +397,10 @@ Proof.
   - exists (val_of ctx, t2). split; [constructor | reflexivity].
   - exists ((val_of ctx, t2) v$+ (x, a)).
     split; [apply EvalAssign; simpl; exact H | reflexivity].
+  - exists ((val_of ctx, t2) v$+ (x, a1)).
+    split; [eapply EvalCmovTrue; simpl; eassumption | reflexivity].
+  - exists ((val_of ctx, t2) v$+ (x, a2)).
+    split; [eapply EvalCmovFalse; simpl; eassumption | reflexivity].
   - destruct (IHHeval t2) as [ctx_inner'' [H_inner Hval_inner]].
     exists (val_of ctx $+ (x, a), trace_of ctx_inner''). split; [| reflexivity].
     eapply EvalAssignCall with (ctx:=(val_of ctx, t2)); [exact H | simpl; exact H0 | simpl; exact H1 | exact H_inner |].
@@ -458,6 +464,62 @@ Proof.
       rewrite lookup_add_ne; [apply H_agree; exact Hy|].
       intro Heq. subst. rewrite Hy in Hx. discriminate.
 
+  - (* EvalCmovTrue *)
+    simpl in *.
+    destruct (VarSet.mem x out) eqn:Hx.
+    + assert (Hcond: interp_arith cond v2 = c).
+      { rewrite <- H. apply interp_arith_agree.
+        eapply agree_on_subset; [| apply agree_on_sym; exact H_agree]. VarSetDecide.fsetdec. }
+      assert (Ha1: interp_arith e1 v2 = a1).
+      { rewrite <- H1. apply interp_arith_agree.
+        eapply agree_on_subset; [| apply agree_on_sym; exact H_agree]. VarSetDecide.fsetdec. }
+      assert (Ha2: interp_arith e2 v2 = a2).
+      { rewrite <- H2. apply interp_arith_agree.
+        eapply agree_on_subset; [| apply agree_on_sym; exact H_agree]. VarSetDecide.fsetdec. }
+      exists (v2 $+ (x, a1), trace_of ctx). split.
+      * eapply EvalCmovTrue with (ctx:=(v2, trace_of ctx)).
+        -- simpl. exact Hcond.
+        -- exact H0.
+        -- simpl. exact Ha1.
+        -- simpl. exact Ha2.
+      * unfold agree_on. intros y Hy.
+        destruct (vsp.FM.eq_dec x y).
+        -- subst. simpl. repeat (rewrite lookup_add_eq; [| reflexivity]). reflexivity.
+        -- simpl. repeat (rewrite lookup_add_ne; [| auto]).
+           apply H_agree. apply VarSet.mem_spec, VarSet.union_spec. left.
+           apply VarSet.remove_spec. split; [apply VarSet.mem_spec; exact Hy | apply not_eq_sym; exact n].
+    + exists (v2, trace_of ctx). split; [constructor|].
+      unfold agree_on. intros y Hy.
+      rewrite lookup_add_ne; [apply H_agree; exact Hy|].
+      intro Heq. subst. rewrite Hy in Hx. discriminate.
+
+  - (* EvalCmovFalse *)
+    simpl in *.
+    destruct (VarSet.mem x out) eqn:Hx.
+    + assert (Hcond: interp_arith cond v2 = 0).
+      { rewrite <- H. apply interp_arith_agree.
+        eapply agree_on_subset; [| apply agree_on_sym; exact H_agree]. VarSetDecide.fsetdec. }
+      assert (Ha1: interp_arith e1 v2 = a1).
+      { rewrite <- H0. apply interp_arith_agree.
+        eapply agree_on_subset; [| apply agree_on_sym; exact H_agree]. VarSetDecide.fsetdec. }
+      assert (Ha2: interp_arith e2 v2 = a2).
+      { rewrite <- H1. apply interp_arith_agree.
+        eapply agree_on_subset; [| apply agree_on_sym; exact H_agree]. VarSetDecide.fsetdec. }
+      exists (v2 $+ (x, a2), trace_of ctx). split.
+      * eapply EvalCmovFalse with (ctx:=(v2, trace_of ctx)).
+        -- simpl. exact Hcond.
+        -- simpl. exact Ha1.
+        -- simpl. exact Ha2.
+      * unfold agree_on. intros y Hy.
+        destruct (vsp.FM.eq_dec x y).
+        -- subst. simpl. repeat (rewrite lookup_add_eq; [| reflexivity]). reflexivity.
+        -- simpl. repeat (rewrite lookup_add_ne; [| auto]).
+           apply H_agree. apply VarSet.mem_spec, VarSet.union_spec. left.
+           apply VarSet.remove_spec. split; [apply VarSet.mem_spec; exact Hy | apply not_eq_sym; exact n].
+    + exists (v2, trace_of ctx). split; [constructor|].
+      unfold agree_on. intros y Hy.
+      rewrite lookup_add_ne; [apply H_agree; exact Hy|].
+      intro Heq. subst. rewrite Hy in Hx. discriminate.
   - simpl in *.
     assert (Ha1: interp_arith e1 v2 = a1).
     { rewrite <- H0. apply interp_arith_agree.

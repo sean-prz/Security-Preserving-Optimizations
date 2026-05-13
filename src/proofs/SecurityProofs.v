@@ -87,6 +87,48 @@ Proof.
         eapply interp_sec_public_agree; eauto.
       + destruct (x ==v param); [ congruence | ].
         autorewrite with core in *. apply Hagree. exact Hparam.
+  - (* Cmov *)
+    split.
+    { invert_evals; reflexivity. }
+    invert_evals; resolve_maps; destruct (param ==v x).
+    + (* True / True, param = x *)
+      subst. destruct (x ==v x); [ | congruence ].
+      autorewrite with core in *.
+      destruct (interp_sec cond se) eqn:Hcond_sec; destruct (interp_sec e1 se) eqn:He1_sec; destruct (interp_sec e2 se) eqn:He2_sec;
+      cbn in Hparam; try discriminate.
+      apply f_equal. eapply interp_sec_public_agree; eauto.
+    + (* True / True, param <> x *)
+      destruct (x ==v param); [ congruence | ].
+      autorewrite with core in *. apply Hagree. exact Hparam.
+    + (* True / False, param = x *)
+      subst. destruct (x ==v x); [ | congruence ].
+      autorewrite with core in *.
+      destruct (interp_sec cond se) eqn:Hcond_sec; destruct (interp_sec e1 se) eqn:He1_sec; destruct (interp_sec e2 se) eqn:He2_sec;
+      cbn in Hparam; try discriminate.
+      assert (Hcond_val: interp_arith cond v1 = interp_arith cond v2) by (eapply interp_sec_public_agree; eauto).
+      congruence.
+    + (* True / False, param <> x *)
+      destruct (x ==v param); [ congruence | ].
+      autorewrite with core in *. apply Hagree. exact Hparam.
+    + (* False / True, param = x *)
+      subst. destruct (x ==v x); [ | congruence ].
+      autorewrite with core in *.
+      destruct (interp_sec cond se) eqn:Hcond_sec; destruct (interp_sec e1 se) eqn:He1_sec; destruct (interp_sec e2 se) eqn:He2_sec;
+      cbn in Hparam; try discriminate.
+      assert (Hcond_val: interp_arith cond v1 = interp_arith cond v2) by (eapply interp_sec_public_agree; eauto).
+      congruence.
+    + (* False / True, param <> x *)
+      destruct (x ==v param); [ congruence | ].
+      autorewrite with core in *. apply Hagree. exact Hparam.
+    + (* False / False, param = x *)
+      subst. destruct (x ==v x); [ | congruence ].
+      autorewrite with core in *.
+      destruct (interp_sec cond se) eqn:Hcond_sec; destruct (interp_sec e1 se) eqn:He1_sec; destruct (interp_sec e2 se) eqn:He2_sec;
+      cbn in Hparam; try discriminate.
+      apply f_equal. eapply interp_sec_public_agree; eauto.
+    + (* False / False, param <> x *)
+      destruct (x ==v param); [ congruence | ].
+      autorewrite with core in *. apply Hagree. exact Hparam.
   - (* AssignCall*)
     (* Unify duplicated function environments and extract contexts. *)
     invert_evals. rewrite H in H10, H22; inversion H10; inversion H22; subst; clear H10 H22.

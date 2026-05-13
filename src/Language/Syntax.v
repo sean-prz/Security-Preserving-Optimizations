@@ -46,6 +46,7 @@ Inductive cmd :=
 | Skip : cmd
 | Assign : var -> expr -> cmd
 | AssignCall : var -> var -> expr -> expr -> cmd
+| Cmov : var -> expr -> expr -> expr -> cmd
 | Sequence : cmd -> cmd -> cmd
 | If : expr -> cmd -> cmd -> cmd
 | While : expr -> cmd -> cmd.

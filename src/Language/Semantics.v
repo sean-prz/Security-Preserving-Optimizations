@@ -198,6 +198,21 @@ Inductive eval (phi: function_env): context -> cmd -> context -> Prop :=
   | EvalAssign: forall ctx x e a,
       interp_arith e (val_of ctx) = a ->
       eval phi ctx (Assign x e) (ctx v$+ (x, a))
+  | EvalCmovTrue: forall ctx x cond e1 e2 c a1 a2,
+      interp_arith cond (val_of ctx) = c ->
+      c <> 0 ->
+      interp_arith e1 (val_of ctx) = a1 ->
+      (* We evaluate both branches of the Cmov, so that it takes the same time
+      regardless of the condition.  The result is the same as the "then" branch,
+      but the "else" branch is still evaluated to ensure constant-time. *)
+      interp_arith e2 (val_of ctx) = a2 ->
+      eval phi ctx (Cmov x cond e1 e2) (ctx v$+ (x, a1))
+  | EvalCmovFalse: forall ctx x cond e1 e2 a1 a2,
+      interp_arith cond (val_of ctx) = 0 ->
+      (* Same as CmovTrue, but for the false branch *)
+      interp_arith e1 (val_of ctx) = a1 ->
+      interp_arith e2 (val_of ctx) = a2 ->
+      eval phi ctx (Cmov x cond e1 e2) (ctx v$+ (x, a2))
   | EvalAssignCall: forall x f e1 e2 x1 x2 y body a1 a2 a ctx ctx',
     phi $? f = Some ((x1, x2), y, body) ->
     interp_arith e1 (val_of ctx) = a1 ->
@@ -249,6 +264,14 @@ Proof.
     invert_eval. auto.
   - (* Assign *)
     invert_eval. auto.
+  - (* CmovTrue *)
+    invert_eval.
+    + auto.
+    + lia.
+  - (* CmovFalse *)
+    invert_eval.
+    + lia.
+    + auto.
   - (* AssignCall *)
     invert_eval.
     rewrite H in H7. inversion H7. subst.
@@ -309,6 +332,19 @@ Inductive eval_sec (phi : function_env) : sec_context -> cmd -> sec_context -> P
       interp_arith e (sec_val_of ctx) = a ->
       interp_sec e (sec_of ctx) = level ->
       eval_sec phi ctx (Assign x e) ((ctx sv$+ (x, a)) s$+ (x, level))
+  | EvalSecCmovTrue : forall ctx x cond e1 e2 c a1 a2 level,
+      interp_arith cond (sec_val_of ctx) = c ->
+      c <> 0 ->
+      interp_arith e1 (sec_val_of ctx) = a1 ->
+      interp_arith e2 (sec_val_of ctx) = a2 ->
+      join_sec (interp_sec cond (sec_of ctx)) (join_sec (interp_sec e1 (sec_of ctx)) (interp_sec e2 (sec_of ctx))) = level ->
+      eval_sec phi ctx (Cmov x cond e1 e2) ((ctx sv$+ (x, a1)) s$+ (x, level))
+  | EvalSecCmovFalse : forall ctx x cond e1 e2 a1 a2 level,
+      interp_arith cond (sec_val_of ctx) = 0 ->
+      interp_arith e1 (sec_val_of ctx) = a1 ->
+      interp_arith e2 (sec_val_of ctx) = a2 ->
+      join_sec (interp_sec cond (sec_of ctx)) (join_sec (interp_sec e1 (sec_of ctx)) (interp_sec e2 (sec_of ctx))) = level ->
+      eval_sec phi ctx (Cmov x cond e1 e2) ((ctx sv$+ (x, a2)) s$+ (x, level))
   | EvalSecAssignCall : forall x f e1 e2 x1 x2 y body a1 a2 level1 level2 ctx ctx' a level,
       phi $? f = Some ((x1, x2), y, body) ->
       interp_arith e1 (sec_val_of ctx) = a1 ->
@@ -366,6 +402,14 @@ Proof.
     invert_eval_sec. auto.
   - (* Assign *)
     invert_eval_sec. auto.
+  - (* CmovTrue *)
+    invert_eval_sec.
+    + auto.
+    + lia.
+  - (* CmovFalse *)
+    invert_eval_sec.
+    + lia.
+    + auto.
   - (* AssignCall *)
     invert_eval_sec.
     rewrite H in H10. inversion H10. subst.
@@ -428,6 +472,10 @@ Inductive ct_cmd (phi : function_env) : sec_env -> cmd -> sec_env -> Prop :=
   | CtAssign : forall se x e level,
       interp_sec e se = level ->
       ct_cmd phi se (Assign x e) (se $+ (x, level))
+  | CtCmov : forall se x cond e1 e2 level,
+      (* We allow conditioning on secret values, because no *)
+      join_sec (interp_sec cond se) (join_sec (interp_sec e1 se) (interp_sec e2 se)) = level ->
+      ct_cmd phi se (Cmov x cond e1 e2) (se $+ (x, level))
   | CtAssignCall : forall se x f e1 e2 x1 x2 y body body_se level1 level2 level,
       phi $? f = Some ((x1, x2), y, body) ->
       interp_sec e1 se = level1 ->
