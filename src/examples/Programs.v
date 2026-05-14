@@ -221,3 +221,11 @@ Definition while_issue4_body :=
   done).
 
 Definition while_issue4_p := single_out_pgm while_issue4_body "y".
+
+Definition old_secret_branch :=
+  If (Var "secret_flag")
+    (Assign "out" (Var "data1"))
+    (Assign "out" (Var "data2")).
+
+Definition new_cmov_branch :=
+  Cmov "out" (Var "secret_flag") (Var "data1") (Var "data2").
