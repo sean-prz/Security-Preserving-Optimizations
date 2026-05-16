@@ -222,14 +222,14 @@ Proof.
     revert v2 final_v2 trace2 Hagree_inv Heval2.
     dependent induction Heval1.
 
-    + (* EvalWhileTrue *)
+    + (* EvalTraceWhileTrue *)
       intros v2 final_v2 trace2 Hagree_inv Heval2.
       inversion Heval2; subst; clear Heval2.
       * (* Case 1: Both take True branch *)
         cbn in *.
         destruct ctx' as [v1' t1'].
         match goal with
-        | H : eval phi _ body ?ctx2' |- _ => destruct ctx2' as [v2' t2']
+        | H : eval_trace phi _ body ?ctx2' |- _ => destruct ctx2' as [v2' t2']
         end.
 
         edestruct IHHct as [Htrace_body Hmem_body]; eauto.
@@ -241,17 +241,17 @@ Proof.
 
       * (* Case 2: Contradiction - v1 True, v2 False *)
         cbn in *.
-        (* inversion unified v2 with final_v2 because EvalWhileFalse doesn't change the valuation *)
+        (* inversion unified v2 with final_v2 because EvalTraceWhileFalse doesn't change the valuation *)
         assert (Hcond: interp_arith e v1 = interp_arith e final_v2).
         {eapply interp_sec_public_agree; eauto. }
         congruence.
 
-    + (* EvalWhileFalse *)
+    + (* EvalTraceWhileFalse *)
       intros v2 final_v2 trace2 Hagree_inv Heval2.
       inversion Heval2; subst; clear Heval2.
       * (* Case 3: Contradiction - v1 False, v2 True *)
         cbn in *.
-        (* inversion unified v1 with final_v1 because EvalWhileFalse doesn't change the valuation *)
+        (* inversion unified v1 with final_v1 because EvalTraceWhileFalse doesn't change the valuation *)
         assert (Hcond: interp_arith e final_v1 = interp_arith e v2) by (eapply interp_sec_public_agree; eauto).
         congruence.
 
