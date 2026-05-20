@@ -52,3 +52,47 @@ Proof.
   unfold join_sec_env, update_sec.
   VarSetDecide.fsetdec.
 Qed.
+
+Lemma lookup_update_sec_eq : forall se x level,
+  sec_lookup (update_sec se x level) x = level.
+Proof.
+  intros. unfold sec_lookup, update_sec.
+  destruct level; simpl.
+  - (* Public *) rewrite VarSetEqProps.remove_mem_1. reflexivity.
+  - (* Secret *) rewrite VarSetEqProps.add_mem_1. reflexivity.
+Qed.
+
+Lemma lookup_update_sec_ne : forall se x y level,
+  x <> y ->
+  sec_lookup (update_sec se x level) y = sec_lookup se y.
+Proof.
+  intros. unfold sec_lookup, update_sec.
+  destruct level; simpl.
+  - (* Public *) rewrite VarSetEqProps.remove_mem_2; [reflexivity | assumption].
+  - (* Secret *) rewrite VarSetEqProps.add_mem_2; [reflexivity | assumption].
+Qed.
+
+Lemma lookup_senv_mk2_eq1 : forall x1 x2 l1 l2,
+  x1 <> x2 ->
+  sec_lookup (senv_mk2 x1 x2 l1 l2) x1 = l1.
+Proof.
+  intros. unfold senv_mk2.
+  rewrite lookup_update_sec_ne by congruence.
+  rewrite lookup_update_sec_eq. reflexivity.
+Qed.
+
+Lemma lookup_senv_mk2_eq2 : forall x1 x2 l1 l2,
+  sec_lookup (senv_mk2 x1 x2 l1 l2) x2 = l2.
+Proof.
+  intros. unfold senv_mk2.
+  rewrite lookup_update_sec_eq. reflexivity.
+Qed.
+
+Lemma lookup_senv_mk2_ne : forall x1 x2 y l1 l2,
+  y <> x1 -> y <> x2 ->
+  sec_lookup (senv_mk2 x1 x2 l1 l2) y = Public.
+Proof.
+  intros. unfold senv_mk2.
+  do 2 rewrite lookup_update_sec_ne by congruence.
+  reflexivity.
+Qed.

@@ -13,6 +13,7 @@ src/Language/Optimizations/Safe/DSE.v
 src/Examples/Programs.v
 src/Proofs/SecEnvProofs.v
 src/Proofs/UnsafeDSEProofs.v
+src/Proofs/EvalEquivalence.v
 src/Proofs/SecurityProofs.v
 src/Proofs/SafeDSEProofs.v
 src/Examples/SecurityUnit.v

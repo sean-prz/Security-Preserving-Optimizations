@@ -52,11 +52,11 @@ Fixpoint interp_arith (e: expr) (v: valuation) {struct e}: nat :=
     example:
 
                     ⟦e⟧ᵥ = a
-      ----------------------------------- EvalAssign
+      ----------------------------------- EvalTraceAssign
        (v, Assign x e) ↓ᵩ (v $+ (x, a))
 
        (c1, v) ↓ᵩ v'   (c2, v') ↓ᵩ v''
-      ----------------------------------- EvalSequence
+      ----------------------------------- EvalTraceSequence
           (v, Sequence c1 c2) ↓ᵩ v''
 
     Notice the subscript φ: this indicates that we have an function_env of functions.
@@ -73,7 +73,7 @@ Fixpoint interp_arith (e: expr) (v: valuation) {struct e}: nat :=
 
         phi = $0 $+ ("factorial", (("n", ""), "f", FactBody))
 
-    We need an additional rule [EvalAssignCall] for function calls:
+    We need an additional rule [EvalTraceAssignCall] for function calls:
 
                (f ↦ ((x1, x2), y, body)) ∈ φ
                   ⟦e1⟧ᵥ = a1    ⟦e2⟧ᵥ = a2
@@ -99,69 +99,150 @@ Fixpoint interp_arith (e: expr) (v: valuation) {struct e}: nat :=
 
    Here is how it looks in Rocq: *)
 
-Inductive eval (phi: function_env): context -> cmd -> context -> Prop :=
-  | EvalSkip: forall ctx,
-      eval phi ctx Skip ctx
-  | EvalAssign: forall ctx x e a,
+
+
+Inductive eval (phi: function_env): valuation -> cmd -> valuation -> Prop :=
+  | EvalSkip: forall v,
+      eval phi v Skip v
+  | EvalAssign: forall v x e a,
+      interp_arith e v = a ->
+      eval phi v (Assign x e) (v $+ (x, a))
+  | EvalCmovTrue: forall v x cond e1 e2 c a1 a2,
+      interp_arith cond v = c ->
+      c <> 0 ->
+      interp_arith e1 v = a1 ->
+      interp_arith e2 v = a2 ->
+      eval phi v (Cmov x cond e1 e2) (v $+ (x, a1))
+  | EvalCmovFalse: forall v x cond e1 e2 a1 a2,
+      interp_arith cond v = 0 ->
+      interp_arith e1 v = a1 ->
+      interp_arith e2 v = a2 ->
+      eval phi v (Cmov x cond e1 e2) (v $+ (x, a2))
+  | EvalAssignCall: forall x f e1 e2 x1 x2 y body a1 a2 a v v',
+    phi $? f = Some ((x1, x2), y, body) ->
+    interp_arith e1 v = a1 ->
+    interp_arith e2 v = a2 ->
+    eval phi ($0 $+ (x1, a1) $+ (x2, a2)) body v' ->
+    v' $? y = Some a ->
+    eval phi v (AssignCall x f e1 e2) (v $+ (x, a))
+  | EvalSequence: forall v c1 v1 c2 v2,
+      eval phi v c1 v1 ->
+      eval phi v1 c2 v2 ->
+      eval phi v (Sequence c1 c2) v2
+  | EvalIfTrue: forall v e thn els v' c,
+      interp_arith e v = c ->
+      c <> 0 ->
+      eval phi v thn v' ->
+      eval phi v (If e thn els) v'
+  | EvalIfFalse: forall v e thn els v',
+      interp_arith e v = 0 ->
+      eval phi v els v' ->
+      eval phi v (If e thn els) v'
+  | EvalWhileTrue: forall v e body v' v'' c,
+      interp_arith e v = c ->
+      c <> 0 ->
+      eval phi v body v' ->
+      eval phi v' (While e body) v'' ->
+      eval phi v (While e body) v''
+  | EvalWhileFalse: forall v e body,
+      interp_arith e v = 0 ->
+      eval phi v (While e body) v.
+
+
+Theorem eval_deterministic :
+    forall phi c v0 v1 v2,
+      eval phi v0 c v1 ->
+      eval phi v0 c v2 ->
+      v1 = v2.
+  Proof.
+    intros phi c v0 v1 v2 H.
+    revert v2.
+    induction H; simpl; intros.
+    - inversion H. reflexivity.
+    - inversion H0; subst;
+    reflexivity.
+    - inversion H3; subst; try reflexivity; congruence.
+    - inversion H2; subst; try reflexivity; congruence.
+    - inversion H4; subst.
+      rewrite H in H9. injection H9; intros; subst.
+      apply IHeval in H14. subst.
+      congruence.
+    - inversion H1; subst.
+      apply IHeval1 in H5.
+      subst.
+      firstorder.
+    - inversion H2; subst; firstorder.
+    - inversion H1; subst; firstorder.
+    - inversion H3; subst.
+      + apply IHeval1 in H9.
+        subst.
+        apply IHeval2 in H11.
+        assumption.
+      + congruence.
+    - inversion H0; subst; firstorder.
+Qed.
+
+
+
+Inductive eval_trace (phi: function_env): context -> cmd -> context -> Prop :=
+  | EvalTraceSkip: forall ctx,
+      eval_trace phi ctx Skip ctx
+  | EvalTraceAssign: forall ctx x e a,
       interp_arith e (val_of ctx) = a ->
-      eval phi ctx (Assign x e) (ctx v$+ (x, a))
-  | EvalCmovTrue: forall ctx x cond e1 e2 c a1 a2,
+      eval_trace phi ctx (Assign x e) (ctx v$+ (x, a))
+  | EvalTraceCmovTrue: forall ctx x cond e1 e2 c a1 a2,
       interp_arith cond (val_of ctx) = c ->
       c <> 0 ->
       interp_arith e1 (val_of ctx) = a1 ->
-      (* We evaluate both branches of the Cmov, so that it takes the same time
-      regardless of the condition.  The result is the same as the "then" branch,
-      but the "else" branch is still evaluated to ensure constant-time. *)
       interp_arith e2 (val_of ctx) = a2 ->
-      eval phi ctx (Cmov x cond e1 e2) (ctx v$+ (x, a1))
-  | EvalCmovFalse: forall ctx x cond e1 e2 a1 a2,
+      eval_trace phi ctx (Cmov x cond e1 e2) (ctx v$+ (x, a1))
+  | EvalTraceCmovFalse: forall ctx x cond e1 e2 a1 a2,
       interp_arith cond (val_of ctx) = 0 ->
-      (* Same as CmovTrue, but for the false branch *)
       interp_arith e1 (val_of ctx) = a1 ->
       interp_arith e2 (val_of ctx) = a2 ->
-      eval phi ctx (Cmov x cond e1 e2) (ctx v$+ (x, a2))
-  | EvalAssignCall: forall x f e1 e2 x1 x2 y body a1 a2 a ctx ctx',
+      eval_trace phi ctx (Cmov x cond e1 e2) (ctx v$+ (x, a2))
+  | EvalTraceAssignCall: forall x f e1 e2 x1 x2 y body a1 a2 a ctx ctx',
     phi $? f = Some ((x1, x2), y, body) ->
     interp_arith e1 (val_of ctx) = a1 ->
     interp_arith e2 (val_of ctx) = a2 ->
     (*reset the environmnet, but keep the trace. we could also simply append it after*)
-    eval phi (($0 $+ (x1, a1) $+ (x2, a2)), trace_of ctx) body ctx' ->
+    eval_trace phi (($0 $+ (x1, a1) $+ (x2, a2)), trace_of ctx) body ctx' ->
     val_of ctx' $? y = Some a ->
-    eval phi ctx (AssignCall x f e1 e2) (val_of ctx $+ (x, a), trace_of ctx')
-  | EvalSequence: forall ctx c1 ctx1 c2 ctx2,
-      eval phi ctx c1 ctx1 ->
-      eval phi ctx1 c2 ctx2 ->
-      eval phi ctx (Sequence c1 c2) ctx2
-  | EvalIfTrue: forall ctx e thn els ctx' c,
+    eval_trace phi ctx (AssignCall x f e1 e2) (val_of ctx $+ (x, a), trace_of ctx')
+  | EvalTraceSequence: forall ctx c1 ctx1 c2 ctx2,
+      eval_trace phi ctx c1 ctx1 ->
+      eval_trace phi ctx1 c2 ctx2 ->
+      eval_trace phi ctx (Sequence c1 c2) ctx2
+  | EvalTraceIfTrue: forall ctx e thn els ctx' c,
       interp_arith e (val_of ctx) = c ->
       c <> 0 ->
-      eval phi (ctx t++ Branch true) thn ctx' ->
-      eval phi ctx (If e thn els) ctx'
-  | EvalIfFalse: forall ctx e thn els ctx',
+      eval_trace phi (ctx t++ Branch true) thn ctx' ->
+      eval_trace phi ctx (If e thn els) ctx'
+  | EvalTraceIfFalse: forall ctx e thn els ctx',
       interp_arith e (val_of ctx) = 0 ->
-      eval phi (ctx t++ Branch false) els ctx' ->
-      eval phi ctx (If e thn els) ctx'
-  | EvalWhileTrue: forall ctx e body ctx' ctx'' c,
+      eval_trace phi (ctx t++ Branch false) els ctx' ->
+      eval_trace phi ctx (If e thn els) ctx'
+  | EvalTraceWhileTrue: forall ctx e body ctx' ctx'' c,
       interp_arith e (val_of ctx) = c ->
       c <> 0 ->
-      eval phi (ctx t++ Branch true) body ctx' ->
-      eval phi ctx' (While e body) ctx'' ->
-      eval phi ctx (While e body) ctx''
-  | EvalWhileFalse: forall ctx e body,
+      eval_trace phi (ctx t++ Branch true) body ctx' ->
+      eval_trace phi ctx' (While e body) ctx'' ->
+      eval_trace phi ctx (While e body) ctx''
+  | EvalTraceWhileFalse: forall ctx e body,
       interp_arith e (val_of ctx) = 0 ->
-      eval phi ctx (While e body) (ctx t++ Branch false).
+      eval_trace phi ctx (While e body) (ctx t++ Branch false).
 
 
 (* The evaluation relation is deterministic: if a command can evaluate to two
 different contexts, those contexts must be the same. *)
-Theorem eval_deterministic : forall phi c ctx ctx1 ctx2,
-  eval phi ctx c ctx1 ->
-  eval phi ctx c ctx2 ->
+Theorem eval_trace_deterministic : forall phi c ctx ctx1 ctx2,
+  eval_trace phi ctx c ctx1 ->
+  eval_trace phi ctx c ctx2 ->
   ctx1 = ctx2.
 Proof.
     Ltac invert_eval :=
     match goal with
-    | H : eval _ _ _ _ |- _ => inversion H; subst; clear H
+    | H : eval_trace _ _ _ _ |- _ => inversion H; subst; clear H
     end.
 
   intros phi c ctx ctx1 ctx2 Heval1.

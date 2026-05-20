@@ -36,10 +36,10 @@ Proof.
      +  repeat rewrite lookup_add_ne by congruence.
         reflexivity.
     }
-    assert (Hpre2 : eval $0 (v1, nil) secret_guard_program
+    assert (Hpre2 : eval_trace $0 (v1, nil) secret_guard_program
             (v1 $+ ("x", 1), (Branch true :: nil)%list)).
     {
-        eapply EvalIfTrue.
+        eapply EvalTraceIfTrue.
         simpl.
         unfold v1.
         rewrite lookup_add_eq; reflexivity.
@@ -47,10 +47,10 @@ Proof.
         constructor.
         reflexivity.
     }
-    assert (Hpre3 : eval $0 (v2, nil) secret_guard_program
+    assert (Hpre3 : eval_trace $0 (v2, nil) secret_guard_program
             (v2 $+ ("x", 0), (Branch false :: nil)%list)).
     {
-        eapply EvalIfFalse.
+        eapply EvalTraceIfFalse.
         simpl.
         unfold v2.
         rewrite lookup_add_eq; reflexivity.

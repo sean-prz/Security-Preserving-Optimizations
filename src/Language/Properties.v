@@ -102,8 +102,8 @@ In both cases, we only strengthen the definition, so it is not a problem.
 Definition non_inference (phi: function_env) (se: sec_env) (c: cmd) (se_out: sec_env) : Prop :=
   forall v1 v2 t_in final_v1 final_v2 trace1 trace2,
     agree_on_public se v1 v2 ->
-    eval phi (v1, t_in) c (final_v1, trace1) ->
-    eval phi (v2, t_in) c (final_v2, trace2) ->
+    eval_trace phi (v1, t_in) c (final_v1, trace1) ->
+    eval_trace phi (v2, t_in) c (final_v2, trace2) ->
     trace1 = trace2 /\ agree_on_public se_out final_v1 final_v2.
 
 

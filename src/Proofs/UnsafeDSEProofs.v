@@ -396,230 +396,220 @@ Proof.
   simpl in Heq. VarSetDecide.fsetdec.
 Qed.
 
-Lemma eval_trace_insensitive: forall phi v t1 t2 c ctx',
-  eval phi (v, t1) c ctx' ->
-  exists ctx'', eval phi (v, t2) c ctx'' /\ val_of ctx'' = val_of ctx'.
-Proof.
-  enough (H_gen : forall phi ctx c ctx',
-    eval phi ctx c ctx' ->
-    forall t2, exists ctx'', eval phi (val_of ctx, t2) c ctx'' /\ val_of ctx'' = val_of ctx')
-    by (intros phi v t1 t2 c ctx' H; exact (H_gen phi (v, t1) c ctx' H t2)).
-  intros phi ctx c ctx' Heval. induction Heval; intros t2.
-  - exists (val_of ctx, t2). split; [constructor | reflexivity].
-  - exists ((val_of ctx, t2) v$+ (x, a)).
-    split; [apply EvalAssign; simpl; exact H | reflexivity].
-  - exists ((val_of ctx, t2) v$+ (x, a1)).
-    split; [eapply EvalCmovTrue; simpl; eassumption | reflexivity].
-  - exists ((val_of ctx, t2) v$+ (x, a2)).
-    split; [eapply EvalCmovFalse; simpl; eassumption | reflexivity].
-  - destruct (IHHeval t2) as [ctx_inner'' [H_inner Hval_inner]].
-    exists (val_of ctx $+ (x, a), trace_of ctx_inner''). split; [| reflexivity].
-    eapply EvalAssignCall with (ctx:=(val_of ctx, t2)); [exact H | simpl; exact H0 | simpl; exact H1 | exact H_inner |].
-    rewrite Hval_inner. exact H2.
-  - destruct (IHHeval1 t2) as [[v_mid t_mid] [H_mid Hval_mid]].
-    destruct (IHHeval2 t_mid) as [ctx_out'' [H_out Hval_out]].
-    exists ctx_out''. split; [| exact Hval_out].
-    eapply EvalSequence; [exact H_mid |].
-    simpl in Hval_mid. rewrite  Hval_mid. exact H_out.
-  - destruct (IHHeval (app t2 (Branch true::nil))) as [ctx'' [H_if Hval_if]].
-    exists ctx''. split; [| exact Hval_if].
-    eapply EvalIfTrue; [simpl; exact H | exact H0 | simpl in H_if; exact H_if].
-  - destruct (IHHeval (app t2 (Branch false::nil))) as [ctx'' [H_if Hval_if]].
-    exists ctx''. split; [| exact Hval_if].
-    eapply EvalIfFalse; [simpl; exact H | simpl in H_if; exact H_if].
-  - destruct (IHHeval1 (app t2 (Branch true::nil))) as [[v_body t_body] [H_body Hval_body]].
-    destruct (IHHeval2 t_body) as [ctx_final'' [H_final Hval_final]].
-    exists ctx_final''. split; [| exact Hval_final].
-    eapply EvalWhileTrue; [simpl; exact H | exact H0 | simpl in H_body; exact H_body |].
-    simpl in Hval_body. rewrite Hval_body. exact H_final.
-  - exists (val_of ctx, (app t2 (Branch false::nil))).
-    split; [apply EvalWhileFalse; simpl; exact H | reflexivity].
-Qed.
-
-
-    (* ================================================================= *)
+(* ================================================================= *)
 (*  dse_helper soundness (main inductive lemma)               *)
 (* ================================================================= *)
 
 
-Lemma dse_helper_sound: forall phi c out ctx1 ctx1',
-  eval phi ctx1 c ctx1' ->
-  forall v2,
-    agree_on (liveness c out) (val_of ctx1) v2 ->
-    exists ctx2',
-      eval phi (v2, trace_of ctx1) (dse_helper c out) ctx2' /\
-      agree_on out (val_of ctx1') (val_of ctx2').
+Lemma dse_helper_sound: forall phi c out v1 v2 v1',
+  agree_on (liveness c out) v1 v2 ->
+  eval phi v1 c v1' ->
+  exists v2',
+    eval phi v2 (dse_helper c out) v2' /\
+    agree_on out v1' v2'.
 Proof.
-Ltac solve_interp_agree :=
-  match goal with
-  | H_eval: interp_arith ?e ?v1 = ?val, H_agree: agree_on _ ?v1 ?v2 |- interp_arith ?e ?v2 = ?val =>
-      rewrite <- H_eval;
-      apply interp_arith_agree;
-      eapply agree_on_subset; [| apply agree_on_sym; exact H_agree];
-      VarSetDecide.fsetdec
-  end.
+  intros phi c out v1 v2 v1' H_agree H. revert out v2 H_agree.
+  induction H; intros out v_2 H_agree.
 
-(* Automates the map equality proof when a variable is LIVE (updated on both sides) *)
-Ltac solve_agree_live H_agree :=
-  unfold agree_on; intros y0 Hy0; simpl;
-  match goal with
-  | |- ?m1 $+ (?x, _) $? ?y = ?m2 $+ (?x, _) $? ?y =>
-      destruct (vsp.FM.eq_dec x y) as [Heq | Hneq];
-      [ subst; repeat (rewrite lookup_add_eq; [| reflexivity]); reflexivity
-      | repeat (rewrite lookup_add_ne; [| auto]);
-        apply H_agree; apply VarSet.mem_spec, VarSet.union_spec; left;
-        apply VarSet.remove_spec; split; [apply VarSet.mem_spec; exact Hy0 | apply not_eq_sym; exact Hneq] ]
-  end.
+  - exists v_2. split; [constructor | exact H_agree].
 
-(* Automates the map equality proof when a variable is DEAD (skipped, updated on only one side) *)
-Ltac solve_agree_dead H_agree Hx :=
-  unfold agree_on; intros y0 Hy0; simpl;
-  match goal with
-  | |- ?m1 $+ (?x, _) $? ?y = ?m2 $? ?y =>
-      rewrite lookup_add_ne; [apply H_agree; exact Hy0|];
-      intro Heq; subst; rewrite Hy0 in Hx; discriminate
-  end.
-
-  intros phi c out ctx1 ctx1' H. revert out.
-  induction H; intros out v2 H_agree.
-
-  - (* EvalSkip *)
-    exists (v2, trace_of ctx). split; [constructor | exact H_agree].
-  - (* EvalAssign *)
-    simpl in *.
+  - simpl in *.
     destruct (VarSet.mem x out) eqn:Hx.
-    + assert (Ha: interp_arith e v2 = a) by solve_interp_agree.
-      exists (v2 $+ (x, a), trace_of ctx). split.
-      * apply EvalAssign with (ctx:=(v2, trace_of ctx)). simpl. exact Ha.
-      * solve_agree_live H_agree.
-    + exists (v2, trace_of ctx). split; [constructor|].
-      solve_agree_dead H_agree Hx.
+    + assert (Ha: interp_arith e v_2 = a).
+      { rewrite <- H. apply interp_arith_agree.
+        eapply agree_on_subset; [| apply agree_on_sym; exact H_agree]. VarSetDecide.fsetdec. }
+      exists (v_2 $+ (x, a)). split.
+      * apply EvalAssign with (v:=v_2). simpl. exact Ha.
+      * unfold agree_on. intros y Hy.
+        destruct (vsp.FM.eq_dec x y).
+        -- subst. repeat (rewrite lookup_add_eq; [| reflexivity]). simpl. reflexivity.
+        -- repeat (rewrite lookup_add_ne; [| auto]).
+           apply H_agree. apply VarSet.mem_spec, VarSet.union_spec. left.
+           apply VarSet.remove_spec. split; [apply VarSet.mem_spec; exact Hy | apply not_eq_sym; exact n].
+    + exists v_2. split; [constructor|].
+      unfold agree_on. intros y Hy.
+      rewrite lookup_add_ne; [apply H_agree; exact Hy|].
+      intro Heq. subst. rewrite Hy in Hx. discriminate.
 
-  - (* EvalCmovTrue *)
-    simpl in *.
+  - simpl in *.
     destruct (VarSet.mem x out) eqn:Hx.
-    + assert (Hcond: interp_arith cond v2 = c) by solve_interp_agree.
-      assert (Ha1: interp_arith e1 v2 = a1) by solve_interp_agree.
-      assert (Ha2: interp_arith e2 v2 = a2) by solve_interp_agree.
-      exists (v2 $+ (x, a1), trace_of ctx). split.
-      * eapply EvalCmovTrue with (ctx:=(v2, trace_of ctx)); simpl; eassumption.
-      * solve_agree_live H_agree.
-    + exists (v2, trace_of ctx). split; [constructor|].
-        solve_agree_dead H_agree Hx.
+    + assert (Hcond: interp_arith cond v_2 = c).
+      { rewrite <- H. apply interp_arith_agree.
+        eapply agree_on_subset; [| apply agree_on_sym; exact H_agree]. VarSetDecide.fsetdec. }
+      assert (Ha1: interp_arith e1 v_2 = a1).
+      { rewrite <- H1. apply interp_arith_agree.
+        eapply agree_on_subset; [| apply agree_on_sym; exact H_agree]. VarSetDecide.fsetdec. }
+      assert (Ha2: interp_arith e2 v_2 = a2).
+      { rewrite <- H2. apply interp_arith_agree.
+        eapply agree_on_subset; [| apply agree_on_sym; exact H_agree]. VarSetDecide.fsetdec. }
+      exists (v_2 $+ (x, a1)). split.
+      * eapply EvalCmovTrue with (v:=v_2); eassumption.
+      * unfold agree_on. intros y Hy.
+        destruct (vsp.FM.eq_dec x y).
+        -- subst. repeat (rewrite lookup_add_eq; [| reflexivity]). reflexivity.
+        -- repeat (rewrite lookup_add_ne; [| auto]).
+           apply H_agree. apply VarSet.mem_spec, VarSet.union_spec. left.
+           apply VarSet.remove_spec. split; [apply VarSet.mem_spec; exact Hy | apply not_eq_sym; exact n].
+    + exists v_2. split; [constructor|].
+      unfold agree_on. intros y Hy.
+      rewrite lookup_add_ne; [apply H_agree; exact Hy|].
+      intro Heq. subst. rewrite Hy in Hx. discriminate.
 
-  - (* EvalCmovFalse *)
-    simpl in *.
+  - simpl in *.
     destruct (VarSet.mem x out) eqn:Hx.
-    + assert (Hcond: interp_arith cond v2 = 0) by solve_interp_agree.
-      assert (Ha1: interp_arith e1 v2 = a1) by solve_interp_agree.
-      assert (Ha2: interp_arith e2 v2 = a2) by solve_interp_agree.
-      exists (v2 $+ (x, a2), trace_of ctx). split.
-      * eapply EvalCmovFalse with (ctx:=(v2, trace_of ctx)); simpl; eassumption.
-      * solve_agree_live H_agree.
-    + exists (v2, trace_of ctx). split; [constructor|].
-      solve_agree_dead H_agree Hx.
+    + assert (Hcond: interp_arith cond v_2 = 0).
+      { rewrite <- H. apply interp_arith_agree.
+        eapply agree_on_subset; [| apply agree_on_sym; exact H_agree]. VarSetDecide.fsetdec. }
+      assert (Ha1: interp_arith e1 v_2 = a1).
+      { rewrite <- H0. apply interp_arith_agree.
+        eapply agree_on_subset; [| apply agree_on_sym; exact H_agree]. VarSetDecide.fsetdec. }
+      assert (Ha2: interp_arith e2 v_2 = a2).
+      { rewrite <- H1. apply interp_arith_agree.
+        eapply agree_on_subset; [| apply agree_on_sym; exact H_agree]. VarSetDecide.fsetdec. }
+      exists (v_2 $+ (x, a2)). split.
+      * eapply EvalCmovFalse with (v:=v_2); eassumption.
+      * unfold agree_on. intros y Hy.
+        destruct (vsp.FM.eq_dec x y).
+        -- subst. repeat (rewrite lookup_add_eq; [| reflexivity]). reflexivity.
+        -- repeat (rewrite lookup_add_ne; [| auto]).
+           apply H_agree. apply VarSet.mem_spec, VarSet.union_spec. left.
+           apply VarSet.remove_spec. split; [apply VarSet.mem_spec; exact Hy | apply not_eq_sym; exact n].
+    + exists v_2. split; [constructor|].
+      unfold agree_on. intros y Hy.
+      rewrite lookup_add_ne; [apply H_agree; exact Hy|].
+      intro Heq. subst. rewrite Hy in Hx. discriminate.
 
-  - (* EvalAssignCall *)
-    simpl in *.
-    assert (Ha1: interp_arith e1 v2 = a1) by solve_interp_agree.
-    assert (Ha2: interp_arith e2 v2 = a2) by solve_interp_agree.
-    exists (v2 $+ (x, a), trace_of ctx'). split.
-    + eapply EvalAssignCall; simpl; eassumption.
-    + solve_agree_live H_agree.
+  - simpl in *.
+    assert (Ha1: interp_arith e1 v_2 = a1).
+    { rewrite <- H0. apply interp_arith_agree.
+      eapply agree_on_subset; [| apply agree_on_sym; exact H_agree]. VarSetDecide.fsetdec. }
+    assert (Ha2: interp_arith e2 v_2 = a2).
+    { rewrite <- H1. apply interp_arith_agree.
+      eapply agree_on_subset; [| apply agree_on_sym; exact H_agree]. VarSetDecide.fsetdec. }
+    exists (v_2 $+ (x, a)). split.
+    + eapply EvalAssignCall; [exact H | simpl; exact Ha1 | simpl; exact Ha2 | exact H2 | exact H3].
+    + unfold agree_on. intros y0 Hy0.
+      destruct (vsp.FM.eq_dec x y0).
+      * subst. simpl. repeat (rewrite lookup_add_eq; [| reflexivity]).  reflexivity.
+      * simpl. repeat (rewrite lookup_add_ne; [| auto]).
+        apply H_agree. apply VarSet.mem_spec, VarSet.union_spec. left.
+        apply VarSet.remove_spec. split; [apply VarSet.mem_spec; exact Hy0 | apply not_eq_sym; exact n].
 
-  - (* EvalSequence *)
-    simpl in *.
-    destruct (IHeval1 (liveness c2 out) v2 H_agree) as [ctx_mid2 [H_mid2 H_agree_mid]].
-    destruct (IHeval2 out (val_of ctx_mid2) H_agree_mid) as [ctx_out2 [H_out2 H_agree_out]].
-    destruct (eval_trace_insensitive phi (val_of ctx_mid2) (trace_of ctx1) (trace_of ctx_mid2)
-                (dse_helper c2 out) ctx_out2 H_out2) as [ctx_out2' [H_out2' Hval_out2']].
-    exists ctx_out2'. split; [| rewrite Hval_out2'; exact H_agree_out].
-    eapply EvalSequence; [exact H_mid2|]. destruct ctx_mid2. assumption.
+  - simpl in *.
+    destruct (IHeval1 (liveness c2 out) v_2 H_agree) as [v_mid2 [H_mid2 H_agree_mid]].
+    destruct (IHeval2 out v_mid2 H_agree_mid) as [v_out2 [H_out2 H_agree_out]].
+    exists v_out2. split; [| assumption].
+    eapply EvalSequence; [exact H_mid2|assumption].
 
-  - (* EvalIfTrue *)
-    simpl in *.
-    assert (Hcond: interp_arith e v2 = c).
+  - simpl in *.
+    assert (Hcond: interp_arith e v_2 = c).
     { rewrite <- H. apply interp_arith_agree.
       eapply agree_on_subset; [| apply agree_on_sym; exact H_agree]. VarSetDecide.fsetdec. }
-    destruct (IHeval out v2) as [ctx2' [H2' H_agree2']].
+    destruct (IHeval out v_2) as [v2' [H2' H_agree2']].
     { eapply agree_on_subset; [| exact H_agree]. VarSetDecide.fsetdec. }
-    exists ctx2'. split; [eapply EvalIfTrue; [simpl; exact Hcond | exact H0 | exact H2'] | exact H_agree2'].
+    exists v2'. split; [eapply EvalIfTrue; [simpl; exact Hcond | exact H0 | exact H2'] | exact H_agree2'].
 
-  - (* EvalIfFalse *)
-    simpl in H_agree |- *.
-    assert (Hcond: interp_arith e v2 = 0).
+  - simpl in H_agree |- *.
+    assert (Hcond: interp_arith e v_2 = 0).
     { rewrite <- H. apply interp_arith_agree.
       eapply agree_on_subset; [| apply agree_on_sym; exact H_agree]. VarSetDecide.fsetdec. }
-    destruct (IHeval out v2) as [ctx2' [H2' H_agree2']].
+    destruct (IHeval out v_2) as [v_2' [H2' H_agree2']].
     { eapply agree_on_subset; [| exact H_agree]. VarSetDecide.fsetdec. }
-    exists ctx2'. split; [eapply EvalIfFalse; [simpl; exact Hcond | exact H2'] | exact H_agree2'].
+    exists v_2'. split; [eapply EvalIfFalse; [simpl; exact Hcond | exact H2'] | exact H_agree2'].
 
-  - (* EvalWhileTrue *)
-    set (fp := liveness (While e body) out).
-    assert (Hcond: interp_arith e v2 = c).
+  - set (fp := liveness (While e body) out).
+    assert (Hcond: interp_arith e v_2 = c).
     { rewrite <- H. apply interp_arith_agree.
       eapply agree_on_subset; [apply liveness_while_cond_subset | apply agree_on_sym; exact H_agree]. }
-    destruct (IHeval1 fp v2) as [ctx_body2 [H_body2 H_agree_body2]].
+    destruct (IHeval1 fp v_2) as [v_body2 [H_body2 H_agree_body2]].
     { eapply agree_on_subset; [apply liveness_while_body_closed | exact H_agree]. }
-    destruct (IHeval2 out (val_of ctx_body2) H_agree_body2) as [ctx_while2 [H_while2 H_agree_while2]].
-    destruct (eval_trace_insensitive phi (val_of ctx_body2) (trace_of ctx') (trace_of ctx_body2)
-                (While e (dse_helper body fp)) ctx_while2 H_while2) as [ctx_while2' [H_while2' Hval_while2']].
-    exists ctx_while2'. split; [| rewrite Hval_while2'; exact H_agree_while2].
-    eapply EvalWhileTrue; [simpl; exact Hcond | exact H0 | | exact H_while2'].
-    simpl. destruct ctx_body2. exact H_body2.
+    destruct (IHeval2 out v_body2 H_agree_body2) as [v_while2 [H_while2 H_agree_while2]].
+    exists v_while2. split; [| assumption].
+    eapply EvalWhileTrue; [simpl; exact Hcond | exact H0 | | exact H_while2].
+    simpl. exact H_body2.
 
-  - (* EvalWhileFalse *)
-    set (fp := liveness (While e body) out).
-    assert (Hcond: interp_arith e v2 = 0).
+  - set (fp := liveness (While e body) out).
+    assert (Hcond: interp_arith e v_2 = 0).
     { rewrite <- H. apply interp_arith_agree.
       eapply agree_on_subset; [apply liveness_while_cond_subset | apply agree_on_sym; exact H_agree]. }
-    exists ((v2, trace_of ctx) t++ Branch false). split.
-    + apply EvalWhileFalse. simpl. exact Hcond.
+    exists v_2. split.
+    + apply EvalWhileFalse. exact Hcond.
     + simpl. eapply agree_on_subset; [| exact H_agree].
       apply while_fixpoint_contains_out.
 Qed.
 
-Lemma opt_unskip_sound: forall phi c ctx ctx',
-  eval phi ctx c ctx' ->
-  exists ctx_opt,
-    eval phi ctx (opt_unskip c) ctx_opt /\
-    val_of ctx' = val_of ctx_opt.
-Proof.
-  induction 1; simpl; intros.
-  Admitted.
 
+
+Lemma opt_unskip_sound: forall phi c v v',
+  eval phi v c v' ->
+  eval phi v (opt_unskip c) v'.
+Proof.
+  (* eval_intro taken from lab6*)
+  Ltac simpl_maps := autorewrite with core in *.
+  Ltac eval_intro :=
+    let eval_intro_solve :=
+        intros; simpl in *; simpl_maps;
+        lazymatch goal with
+        | [  |- eval _ _ _ _ ] => idtac
+        | _ => intuition congruence
+        end in
+    lazymatch goal with
+    | [  |- eval _ _ Skip _ ] =>
+      apply EvalSkip
+    | [  |- eval _ _ (Assign _ _) _ ] =>
+      eapply EvalAssign
+    | [  |- eval _ _ (Cmov _ _ _ _) _ ] =>
+      (eapply EvalCmovFalse + eapply EvalCmovTrue); eval_intro_solve
+    | [  |- eval _ _ (AssignCall _ _ _ _) _ ] =>
+      eapply EvalAssignCall
+    | [  |- eval _ _ (Sequence _ _) _ ] =>
+      eapply EvalSequence
+    | [  |- eval _ _ (While _ _) _ ] =>
+      (eapply EvalWhileTrue + eapply EvalWhileFalse); eval_intro_solve
+    | [  |- eval _ _ (If _ _ _) _ ] =>
+      (eapply EvalIfTrue + eapply EvalIfFalse); eval_intro_solve
+    | [  |- eval _ _ ?cmd _ ] =>
+      unfold cmd at -1 || unfold cmd
+    | [  |- interp_arith _ _ = _ _ ] => econstructor
+    | _ => progress (intros; simpl in *; simpl_maps) || (intuition congruence)
+    end.
+
+    induction 1; simpl; intros; try eval_intro; try eassumption.
+    all: repeat match goal with 
+    | [ |- context[match ?pat with _ => _ end]] => destruct pat
+    end.
+    all: try inversion IHeval1; try inversion IHeval2; subst;
+    try eval_intro; eauto.
+Qed.
 
 
 (* ================================================================= *)
 (*  Final proof                                     *)
 (* ================================================================= *)
 
-Theorem opt_dse_sound: forall phi (pgm: program) ctx ctx',
-  eval phi ctx (cmd_of pgm) ctx' ->
-  exists ctx_opt,
-    eval phi ctx (cmd_of (opt_dse pgm)) ctx_opt /\
-    agree_on (output_of pgm) (val_of ctx') (val_of ctx_opt). (*all output vars are the same*)
+Theorem opt_dse_sound: forall phi (pgm: program) v v',
+  eval phi v (cmd_of pgm) v' ->
+  exists v_opt,
+    eval phi v (cmd_of (opt_dse pgm)) v_opt /\
+    agree_on (output_of pgm) v' v_opt. (*all output vars are the same*)
 Proof.
-  intros phi pgm ctx ctx' Heval.
+  intros phi pgm v v' Heval.
   unfold opt_dse.
-  (* 1: apply dse_helper_sound with ctx1 = ctx2 = ctx *)
-  assert (H_dse: exists ctx_dse,
-    eval phi ctx (dse_helper (cmd_of pgm) (output_of pgm)) ctx_dse /\
-    agree_on (output_of pgm) (val_of ctx') (val_of ctx_dse)).
+  (* 1: apply dse_helper_sound with ctx1 = ctx2 = v *)
+  assert (H_dse: exists v_dse,
+    eval phi v (dse_helper (cmd_of pgm) (output_of pgm)) v_dse /\
+    agree_on (output_of pgm) v' v_dse).
   {
-        destruct ctx.
     destruct pgm.
     simpl.
-    specialize (dse_helper_sound phi c v0 _ _ Heval v). simpl.  intro.
+    specialize (dse_helper_sound phi c v0 v v v'). simpl.  intro.
     eapply H.
     - apply agree_on_refl.
+    - apply Heval.
   }
-  destruct H_dse as [ctx_dse [Hdse_eval Hdse_agree]].
+  destruct H_dse as [v_dse [Hdse_eval Hdse_agree]].
   (* 2: apply opt_unskip_sound to ctx_dse *)
   apply opt_unskip_sound in Hdse_eval.
-  destruct Hdse_eval as [ctx_opt [Hunskip_eval Hunskip_val]].
-  exists ctx_opt.
-  split.
-  - exact Hunskip_eval.
-  - rewrite <- Hunskip_val. exact Hdse_agree.
+  exists v_dse.
+  firstorder.
 Qed.
