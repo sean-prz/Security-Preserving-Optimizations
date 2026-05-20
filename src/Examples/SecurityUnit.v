@@ -212,7 +212,7 @@ Qed.
 Example ct_old_secret_branch_rejected :
   ~ exists se',
       ct_cmd $0
-        ($0 $+ ("secret_flag", Secret) $+ ("data1", Public) $+ ("data2", Public))
+        (senv_mk3 "secret_flag" "data1" "data2" Secret Public Public)
         old_secret_branch
         se'.
 Proof.
@@ -227,7 +227,7 @@ Qed.
 Example ct_new_cmov_branch_ok :
   exists se',
       ct_cmd $0
-        ($0 $+ ("secret_flag", Secret) $+ ("data1", Public) $+ ("data2", Public))
+        (senv_mk3 "secret_flag" "data1" "data2" Secret Public Public)
         new_cmov_branch
         se'.
 Proof.
