@@ -111,49 +111,19 @@ Proof.
     v1 v2 t_in final_v1 final_v2 trace1 trace2 Hagree Heval1 Heval2.
   split.
   { inversion Heval1; inversion Heval2; subst; reflexivity. }
-  inversion Heval1; inversion Heval2; subst; resolve_cmov_maps; destruct (param ==v x).
-  - subst. destruct (x ==v x); [ | congruence ].
-    autorewrite with core in *.
+  inversion Heval1; inversion Heval2; subst; resolve_cmov_maps.
+  all: destruct (param ==v x);
+  [ subst; destruct (x ==v x); [ | congruence ];
+    autorewrite with core in *;
     destruct (interp_sec cond se) eqn:Hcond_sec;
     destruct (interp_sec e1 se) eqn:He1_sec;
     destruct (interp_sec e2 se) eqn:He2_sec;
-    cbn in Hparam; try VarSetDecide.fsetdec.
-    apply f_equal. eapply interp_sec_public_agree; eauto.
-  - destruct (x ==v param); [ congruence | ].
-    autorewrite with core in *. apply Hagree.
-    rewrite <- VarSet.mem_spec in *; rewrite update_skip_ne in Hparam; auto.
-  - subst. destruct (x ==v x); [ | congruence ].
-    autorewrite with core in *.
-    destruct (interp_sec cond se) eqn:Hcond_sec;
-    destruct (interp_sec e1 se) eqn:He1_sec;
-    destruct (interp_sec e2 se) eqn:He2_sec;
-    cbn in Hparam; try VarSetDecide.fsetdec.
-    assert (Hcond_val: interp_arith cond v1 = interp_arith cond v2) by (eapply interp_sec_public_agree; eauto).
-    congruence.
-  - destruct (x ==v param); [ congruence | ].
-    autorewrite with core in *. apply Hagree.
-    rewrite <- VarSet.mem_spec in *; rewrite update_skip_ne in Hparam; auto.
-  - subst. destruct (x ==v x); [ | congruence ].
-    autorewrite with core in *.
-    destruct (interp_sec cond se) eqn:Hcond_sec;
-    destruct (interp_sec e1 se) eqn:He1_sec;
-    destruct (interp_sec e2 se) eqn:He2_sec;
-    cbn in Hparam; try VarSetDecide.fsetdec.
-    assert (Hcond_val: interp_arith cond v1 = interp_arith cond v2) by (eapply interp_sec_public_agree; eauto).
-    congruence.
-  - destruct (x ==v param); [ congruence | ].
-    autorewrite with core in *. apply Hagree.
-    rewrite <- VarSet.mem_spec in *; rewrite update_skip_ne in Hparam; auto.
-  - subst. destruct (x ==v x); [ | congruence ].
-    autorewrite with core in *.
-    destruct (interp_sec cond se) eqn:Hcond_sec;
-    destruct (interp_sec e1 se) eqn:He1_sec;
-    destruct (interp_sec e2 se) eqn:He2_sec;
-    cbn in Hparam; try VarSetDecide.fsetdec.
-    apply f_equal. eapply interp_sec_public_agree; eauto.
-  - destruct (x ==v param); [ congruence | ].
-    autorewrite with core in *. apply Hagree.
-    rewrite <- VarSet.mem_spec in *; rewrite update_skip_ne in Hparam; auto.
+    cbn in Hparam; try VarSetDecide.fsetdec;
+    try (apply f_equal; eapply interp_sec_public_agree; eauto);
+    try (assert (Hcond_val: interp_arith cond v1 = interp_arith cond v2) by (eapply interp_sec_public_agree; eauto); congruence)
+  | destruct (x ==v param); [ congruence | ];
+    autorewrite with core in *; apply Hagree;
+    rewrite <- VarSet.mem_spec in *; rewrite update_skip_ne in Hparam; auto ].
 Qed.
 
 
@@ -542,18 +512,8 @@ Lemma cmov_non_inference_sec : forall phi se x cond e1 e2 level,
   join_sec (interp_sec cond se) (join_sec (interp_sec e1 se) (interp_sec e2 se)) = level ->
   non_inference_sec phi se (Cmov x cond e1 e2) (update_sec se x level).
 Proof.
-  Ltac resolve_sec_update_main x :=
-  intros param Hparam; cbn in *; destruct (x ==v param);
-  [ subst;
-    try rewrite lookup_add_eq in Hparam by reflexivity;
-    repeat rewrite lookup_add_eq by reflexivity;
-    try rewrite <- pub_not_sec in *;
-    repeat rewrite lookup_update_sec_eq in *
-  | try rewrite lookup_add_ne in Hparam by congruence;
-    repeat rewrite lookup_add_ne by congruence;
-    try rewrite <- pub_not_sec in *;
-    repeat rewrite lookup_update_sec_ne in * by congruence
-  ].
+  Ltac resolve_sec_update_main :=
+    intros param Hparam; cbn in *.
 
   unfold non_inference_sec.
   intros phi se x cond e1 e2 level Hjoin ctx1_in ctx2_in ctx1_out ctx2_out Hagree Htrace Heval1 Heval2.
@@ -561,79 +521,38 @@ Proof.
     (split; [assumption |]);
     destruct Hagree as [Hval_agree Hdyn_agree];
     unfold agree_on_public_sec_ctx, agree_on_public in *;
-    split.
-  - resolve_sec_update_main x.
-    + destruct (interp_sec cond se) eqn:Hcond_sec;
-      destruct (interp_sec e1 se) eqn:He1_sec;
-      destruct (interp_sec e2 se) eqn:He2_sec;
-      cbn in *; try discriminate.
-      apply f_equal. eapply interp_sec_public_agree; eauto.
-    + apply Hval_agree. rewrite <- pub_not_sec. exact Hparam.
-  - resolve_sec_update_main x.
-    + destruct (interp_sec cond se) eqn:Hcond_sec;
-      destruct (interp_sec e1 se) eqn:He1_sec;
-      destruct (interp_sec e2 se) eqn:He2_sec;
-      cbn in *; try discriminate.
-      rewrite (interp_sec_dynamic_agree cond se (sec_of ctx1_in) (sec_of ctx2_in) Hdyn_agree Hcond_sec).
-      rewrite (interp_sec_dynamic_agree e1 se (sec_of ctx1_in) (sec_of ctx2_in) Hdyn_agree He1_sec).
-      rewrite (interp_sec_dynamic_agree e2 se (sec_of ctx1_in) (sec_of ctx2_in) Hdyn_agree He2_sec).
-      reflexivity.
-    + apply Hdyn_agree. exact Hparam.
-  - resolve_sec_update_main x.
-    + destruct (interp_sec cond se) eqn:Hcond_sec;
-      destruct (interp_sec e1 se) eqn:He1_sec;
-      destruct (interp_sec e2 se) eqn:He2_sec;
-      cbn in *; try discriminate.
-      assert (Hcond_val: interp_arith cond (sec_val_of ctx1_in) = interp_arith cond (sec_val_of ctx2_in))
-        by (eapply interp_sec_public_agree; eauto).
-      congruence.
-    + apply Hval_agree. rewrite <- pub_not_sec. exact Hparam.
-  - resolve_sec_update_main x.
-    + destruct (interp_sec cond se) eqn:Hcond_sec;
-      destruct (interp_sec e1 se) eqn:He1_sec;
-      destruct (interp_sec e2 se) eqn:He2_sec;
-      cbn in *; try discriminate.
-      rewrite (interp_sec_dynamic_agree cond se (sec_of ctx1_in) (sec_of ctx2_in) Hdyn_agree Hcond_sec).
-      rewrite (interp_sec_dynamic_agree e1 se (sec_of ctx1_in) (sec_of ctx2_in) Hdyn_agree He1_sec).
-      rewrite (interp_sec_dynamic_agree e2 se (sec_of ctx1_in) (sec_of ctx2_in) Hdyn_agree He2_sec).
-      reflexivity.
-    + apply Hdyn_agree. exact Hparam.
-  - resolve_sec_update_main x.
-    + destruct (interp_sec cond se) eqn:Hcond_sec;
-      destruct (interp_sec e1 se) eqn:He1_sec;
-      destruct (interp_sec e2 se) eqn:He2_sec;
-      cbn in *; try discriminate.
-      assert (Hcond_val: interp_arith cond (sec_val_of ctx1_in) = interp_arith cond (sec_val_of ctx2_in))
-        by (eapply interp_sec_public_agree; eauto).
-      congruence.
-    + apply Hval_agree. rewrite <- pub_not_sec. exact Hparam.
-  - resolve_sec_update_main x.
-    + destruct (interp_sec cond se) eqn:Hcond_sec;
-      destruct (interp_sec e1 se) eqn:He1_sec;
-      destruct (interp_sec e2 se) eqn:He2_sec;
-      cbn in *; try discriminate.
-      rewrite (interp_sec_dynamic_agree cond se (sec_of ctx1_in) (sec_of ctx2_in) Hdyn_agree Hcond_sec).
-      rewrite (interp_sec_dynamic_agree e1 se (sec_of ctx1_in) (sec_of ctx2_in) Hdyn_agree He1_sec).
-      rewrite (interp_sec_dynamic_agree e2 se (sec_of ctx1_in) (sec_of ctx2_in) Hdyn_agree He2_sec).
-      reflexivity.
-    + apply Hdyn_agree. exact Hparam.
-  - resolve_sec_update_main x.
-    + destruct (interp_sec cond se) eqn:Hcond_sec;
-      destruct (interp_sec e1 se) eqn:He1_sec;
-      destruct (interp_sec e2 se) eqn:He2_sec;
-      cbn in *; try discriminate.
-      apply f_equal. eapply interp_sec_public_agree; eauto.
-    + apply Hval_agree. rewrite <- pub_not_sec. exact Hparam.
-  - resolve_sec_update_main x.
-    + destruct (interp_sec cond se) eqn:Hcond_sec;
-      destruct (interp_sec e1 se) eqn:He1_sec;
-      destruct (interp_sec e2 se) eqn:He2_sec;
-      cbn in *; try discriminate.
-      rewrite (interp_sec_dynamic_agree cond se (sec_of ctx1_in) (sec_of ctx2_in) Hdyn_agree Hcond_sec).
-      rewrite (interp_sec_dynamic_agree e1 se (sec_of ctx1_in) (sec_of ctx2_in) Hdyn_agree He1_sec).
-      rewrite (interp_sec_dynamic_agree e2 se (sec_of ctx1_in) (sec_of ctx2_in) Hdyn_agree He2_sec).
-      reflexivity.
-    + apply Hdyn_agree. exact Hparam.
+    split; resolve_sec_update_main.
+  all: destruct (x ==v param);
+  [ subst;
+    try rewrite lookup_add_eq in Hparam by reflexivity;
+    repeat rewrite lookup_add_eq by reflexivity;
+    try rewrite <- pub_not_sec in *;
+    repeat rewrite lookup_update_sec_eq in *;
+    destruct (interp_sec cond se) eqn:Hcond_sec;
+    destruct (interp_sec e1 se) eqn:He1_sec;
+    destruct (interp_sec e2 se) eqn:He2_sec;
+    cbn in *; try discriminate;
+    try match goal with
+    | |- Some _ = Some _ =>
+        try (apply f_equal; eapply interp_sec_public_agree; eauto);
+        try (assert (Hcond_val: interp_arith cond (sec_val_of ctx1_in) = interp_arith cond (sec_val_of ctx2_in))
+             by (eapply interp_sec_public_agree; eauto); congruence)
+    | |- join_sec _ _ = join_sec _ _ =>
+        rewrite (interp_sec_dynamic_agree cond se (sec_of ctx1_in) (sec_of ctx2_in) Hdyn_agree Hcond_sec);
+        rewrite (interp_sec_dynamic_agree e1 se (sec_of ctx1_in) (sec_of ctx2_in) Hdyn_agree He1_sec);
+        rewrite (interp_sec_dynamic_agree e2 se (sec_of ctx1_in) (sec_of ctx2_in) Hdyn_agree He2_sec);
+        reflexivity
+    end
+  | try rewrite lookup_add_ne in Hparam by congruence;
+    repeat rewrite lookup_add_ne by congruence;
+    try rewrite <- pub_not_sec in *;
+    repeat rewrite lookup_update_sec_ne in * by congruence;
+    try match goal with
+    | |- _ $? ?v = _ $? ?v =>
+        apply Hval_agree; rewrite <- pub_not_sec; exact Hparam
+    | |- sec_lookup _ ?v = sec_lookup _ ?v =>
+        apply Hdyn_agree; exact Hparam
+    end ].
 Qed.
 
 
