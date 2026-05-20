@@ -18,6 +18,7 @@ rocq:
 	$(ROCQC) $(ROCQFLAGS) src/Examples/Programs.v
 	$(ROCQC) $(ROCQFLAGS) src/Proofs/SecEnvProofs.v
 	$(ROCQC) $(ROCQFLAGS) src/Proofs/UnsafeDSEProofs.v
+	$(ROCQC) $(ROCQFLAGS) src/Proofs/EvalEquivalence.v
 	$(ROCQC) $(ROCQFLAGS) src/Proofs/SecurityProofs.v
 	$(ROCQC) $(ROCQFLAGS) src/Proofs/SafeDSEProofs.v
 	@echo "Running Tests ..."
