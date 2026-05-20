@@ -1,9 +1,11 @@
 Require Import Map.
 Require Import Language.Syntax.
-Require Import Language.Semantics.
-Require Import examples.Programs.
 Require Import VarSets.
 
+Definition program := (cmd * var_set)%type.
+
+Definition cmd_of (pgm: program) := fst pgm.
+Definition output_of (pgm: program) := snd pgm.
 
 (* clean programs by removing skips after DSE *)
 Fixpoint opt_unskip (c: cmd) :  cmd :=
@@ -17,7 +19,7 @@ Fixpoint opt_unskip (c: cmd) :  cmd :=
                           | Skip, Skip => Skip
                           | thenC', elseC' => If cond thenC' elseC'
                           end
-  (* We can't simplify the body because it might be non-terminating *)
+  (* We can't simplify the loop because it might be non-terminating *)
   | While cond body => While cond (opt_unskip body)
   | _ => c
   end.
@@ -42,7 +44,7 @@ Fixpoint vars_in_cmd (c: cmd) : var_set :=
   | While e body => VarSet.union (vars_in_expr e) (vars_in_cmd body)
   end.
 
-  (* Fixpoint algorithm, perform f until no change (max: fuel iterations) *)
+  (* Fixpoint algorithm, perform f until no change (max fuel iterations) *)
 Fixpoint while_fixpoint  (f: var_set -> var_set) (cond_vars: var_set) (out: var_set) (fuel: nat): var_set :=
   match fuel with
   | 0 => out
@@ -73,10 +75,10 @@ Fixpoint while_fixpoint  (f: var_set -> var_set) (cond_vars: var_set) (out: var_
 
 (*More details about formula: https://cs420.epfl.ch/c/06_dataflow.html*)
 Fixpoint liveness (c: cmd) (out: var_set) {struct c}: var_set :=
-  match c with 
+  match c with
   | Skip => out
   | Assign x e =>
-      (* if the assigned value is not live, the values used dont become live 
+      (* if the assigned value is not live, the values used dont become live
       -> propagates backwardsunuse of variables *)
       if VarSet.mem x out
       then VarSet.union (VarSet.remove x out) (vars_in_expr e)
@@ -95,31 +97,3 @@ Fixpoint liveness (c: cmd) (out: var_set) {struct c}: var_set :=
   | While e body =>
         while_fixpoint (liveness body) (vars_in_expr e) out (VarSet.cardinal (vars_in_cmd c))
   end.
-
-
-Fixpoint dse_helper (c: cmd) (out: var_set) : cmd :=
-  match c with
-  | Skip => Skip
-  | Assign x e =>
-      match VarSet.mem x out with
-      | false => Skip (*not live, remove this assignment*)
-      | true => Assign x e (*used later. keep it*)
-      end
-  | Cmov x cond e1 e2 =>
-      match VarSet.mem x out with
-      | false => Skip
-      | true => Cmov x cond e1 e2
-      end
-  (*Keep assigncalls for now, but they could be removed as in simple Assign*)
-  | AssignCall x f e1 e2 => AssignCall x f e1 e2
-  | Sequence c1 c2 =>
-      Sequence (dse_helper c1 (liveness c2 out)) (dse_helper c2 out)
-  | If e thenC elseC =>
-      If e (dse_helper thenC out) (dse_helper elseC out)
-  | While e body =>
-      While e (dse_helper body (liveness c out))
-  end.
-
-Definition opt_dse (pgm: program): program :=
-  (opt_unskip (dse_helper (cmd_of pgm) (output_of pgm)), output_of pgm).
-

@@ -1,6 +1,6 @@
 Require Import Map.
 Require Import Language.Main.
-Require Import examples.Programs.
+Require Import Examples.Programs.
 From Stdlib Require Import List.
 Import ListNotations.
 From Stdlib Require Import Lia.

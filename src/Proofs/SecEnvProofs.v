@@ -1,17 +1,17 @@
 Require Import Map.
+Require Import VarSets.
 Require Import Language.Main.
+Require Import Language.Security.
 
 Lemma lookup_join_env : forall se1 se2 x,
   sec_lookup (join_sec_env se1 se2) x = join_sec (sec_lookup se1 x) (sec_lookup se2 x).
 Proof.
   intros se1 se2 x.
   unfold sec_lookup, join_sec_env.
-  rewrite lookup_merge.
-  destruct (se1 $? x) as [l1|] eqn:H1;
-  destruct (se2 $? x) as [l2|] eqn:H2;
+  rewrite VarSetEqProps.union_mem.
+  destruct (VarSet.mem x se1) eqn:H1;
+  destruct (VarSet.mem x se2) eqn:H2;
   cbn; try reflexivity.
-  - destruct l1; reflexivity.
-  - destruct l2; reflexivity.
 Qed.
 
 
@@ -40,29 +40,15 @@ Lemma join_sec_public_els:
 Proof. intros. apply join_sec_public in H. destruct H. assumption. Qed.
 
 Lemma join_sec_env_idempotent : forall se,
-  join_sec_env se se = se.
+  VarSet.Equal (join_sec_env se se) se.
 Proof.
-  intros se.
-  apply fmap_ext. intro x.
-  unfold join_sec_env.
-  rewrite lookup_merge.
-  destruct (se $? x) as [level|] eqn:Hlookup;
-  cbn; [destruct level; reflexivity | reflexivity].
+  VarSetDecide.fsetdec.
 Qed.
 
-Lemma join_sec_env_update_public_right : forall se x level,
-  se $? x = Some level ->
-  join_sec_env se (se $+ (x, Public)) = se.
+
+Lemma join_sec_env_update_public_right : forall se x,
+  VarSet.Equal (join_sec_env se (update_sec se x Public)) se.
 Proof.
-  intros se x level Hlookup.
-  apply fmap_ext. intro y.
-  unfold join_sec_env.
-  rewrite lookup_merge.
-  destruct (x ==v y) as [->|Hneq].
-  - rewrite Hlookup.
-    rewrite lookup_add_eq by reflexivity.
-    cbn. destruct level; reflexivity.
-  - rewrite lookup_add_ne by congruence.
-    destruct (se $? y) as [ly|] eqn:Hse;
-    cbn; [destruct ly; reflexivity | reflexivity].
+  unfold join_sec_env, update_sec.
+  VarSetDecide.fsetdec.
 Qed.

@@ -1,7 +1,8 @@
 Require Import Map.
 Require Import VarSets.
 Require Import Language.Main.
-Require Import Language.Optimizations.
+Require Import Language.Analysis.
+Require Import Language.Optimizations.Unsafe.DSE.
 
 From Stdlib Require Import Lia.
 
@@ -39,6 +40,16 @@ Proof.
   intros.
   apply eq_sym.
   firstorder.
+Qed.
+
+Lemma agree_on_trans: forall S v1 v2 v3,
+  agree_on S v1 v2 -> agree_on S v2 v3 -> agree_on S v1 v3.
+Proof.
+  unfold agree_on.
+  intros.
+  specialize (H x H1).
+  specialize (H0 x H1).
+  congruence.
 Qed.
 
 Lemma agree_on_subset: forall S S' v1 v2,
