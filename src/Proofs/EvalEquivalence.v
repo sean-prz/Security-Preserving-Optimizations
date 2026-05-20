@@ -1,35 +1,19 @@
 Require Import Language.Main.
 
 
-(* eval_intro taken from lab6*)
-Ltac simpl_maps := autorewrite with core in *.
-Ltac eval_intro :=
-let eval_intro_solve :=
-    intros; simpl in *; simpl_maps;
-    lazymatch goal with
-    | [  |- eval _ _ _ _ ] => idtac
-    | _ => intuition congruence
-    end in
-lazymatch goal with
-| [  |- eval _ _ Skip _ ] =>
-    apply EvalSkip
-| [  |- eval _ _ (Assign _ _) _ ] =>
-    eapply EvalAssign
-| [  |- eval _ _ (Cmov _ _ _ _) _ ] =>
-    (eapply EvalCmovFalse + eapply EvalCmovTrue); eval_intro_solve
-| [  |- eval _ _ (AssignCall _ _ _ _) _ ] =>
-    eapply EvalAssignCall
-| [  |- eval _ _ (Sequence _ _) _ ] =>
-    eapply EvalSequence
-| [  |- eval _ _ (While _ _) _ ] =>
-    (eapply EvalWhileTrue + eapply EvalWhileFalse); eval_intro_solve
-| [  |- eval _ _ (If _ _ _) _ ] =>
-    (eapply EvalIfTrue + eapply EvalIfFalse); eval_intro_solve
-| [  |- eval _ _ ?cmd _ ] =>
-    unfold cmd at -1 || unfold cmd
-| [  |- interp_arith _ _ = _ _ ] => econstructor
-| _ => progress (intros; simpl in *; simpl_maps) || (intuition congruence)
-end.
+Create HintDb eval_db.
+Hint Constructors eval eval_trace eval_sec : eval_db.
+
+(* We provide an explicit hint for EvalTraceAssignCall because the intermediate 
+   context ctx' cannot be synthesized purely from the conclusion by eauto. 
+   We extract it from the induction hypothesis for the body's evaluation. *)
+Hint Extern 1 (eval_trace _ _ (AssignCall _ _ _ _) _) =>
+  match goal with
+  | IH: eval_trace _ _ _ ?c |- _ => eapply EvalTraceAssignCall with (ctx':=c)
+  end : eval_db.
+
+Ltac eval_simpl :=
+  unfold val_of, trace_of, sec_val_of, sec_trace_of, sec_of in *; simpl in *.
 
 
 
@@ -37,17 +21,7 @@ Theorem Eval_proj_trace : forall phi ctx c ctx',
     eval_trace phi ctx c ctx' -> 
     eval phi (val_of ctx) c (val_of ctx').
 Proof.
-  induction 1; simpl; intros.
-  - apply EvalSkip.
-  - eapply EvalAssign; eauto.
-  - eapply EvalCmovTrue; eauto.
-  - eapply EvalCmovFalse; eauto.
-  - eapply EvalAssignCall; eauto.
-  - eapply EvalSequence; eauto.
-  - eapply EvalIfTrue; eauto.
-  - eapply EvalIfFalse; eauto.
-  - eapply EvalWhileTrue; eauto.
-  - eapply EvalWhileFalse; eauto.
+  induction 1; eval_simpl; eauto with eval_db.
 Qed.
 
 
@@ -55,18 +29,7 @@ Theorem Eval_proj_sec : forall phi ctx c ctx',
     eval_sec phi ctx c ctx' ->
     eval_trace phi (sec_val_of ctx, sec_trace_of ctx) c (sec_val_of ctx', sec_trace_of ctx').
 Proof.
-  induction 1; simpl; intros.
-  - apply EvalTraceSkip.
-  - eapply EvalTraceAssign; eauto.
-  - eapply EvalTraceCmovTrue; eauto.
-  - eapply EvalTraceCmovFalse; eauto.
-  - simpl in *.
-    eapply EvalTraceAssignCall with (ctx':=(sec_val_of ctx', sec_trace_of ctx')); eauto.
-  - eapply EvalTraceSequence; eauto.
-  - eapply EvalTraceIfTrue; eauto.
-  - eapply EvalTraceIfFalse; eauto.
-  - eapply EvalTraceWhileTrue; eauto.
-  - eapply EvalTraceWhileFalse; eauto.
+  induction 1; eval_simpl; eauto with eval_db.
 Qed.
 
 Theorem Eval_proj_sec_trace : forall phi ctx c ctx',
