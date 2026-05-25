@@ -4,7 +4,7 @@ Require Import Map.
 Require Import VarSets.
 Require Import Language.Main.
 Require Import Language.Optimizations.Unsafe.DSE.
-Require Import Proofs.SecurityProofs.
+Require Import Proofs.Noninference.
 
 From Stdlib Require Import Lia.
 

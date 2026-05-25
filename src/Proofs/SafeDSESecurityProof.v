@@ -4,13 +4,14 @@ Require Import Language.Main.
 Require Import Language.Analysis.
 Require Import Language.Optimizations.Safe.DSE.
 Require Import Language.Optimizations.Safe.Unskip.
+Require Import Proofs.VarSetAgreement.
 Require Import Proofs.SafeDSEProofs.
 Require Import Proofs.EvalEquivalence.
-Require Import Proofs.SecEnvProofs.
+Require Import Proofs.SecLookup.
 Require Import Proofs.UnskipProofs.
 Require Import Proofs.UnsafeDSEProofs.
-Require Import Proofs.SafeDSEAnalysisProofs.
-Require Import Proofs.SecurityProofs.
+Require Import Proofs.SecEnvSubtyping.
+Require Import Proofs.Noninference.
 
 
 
@@ -129,83 +130,12 @@ Proof.
 Qed.
 
 
-Lemma sec_env_sub_public : forall se_actual se_static x,
-  sec_env_sub se_actual se_static ->
-  sec_lookup se_static x = Public ->
-  sec_lookup se_actual x = Public.
-Proof.
-  intros se_actual se_static x Hsub Hpub.
-  destruct (sec_lookup se_actual x) eqn:Hactual; auto.
-  pose proof (Hsub x Hactual).
-  congruence.
-Qed.
-
-Lemma interp_sec_public_under_sub : forall e se_actual se_static,
-  sec_env_sub se_actual se_static ->
-  interp_sec e se_static = Public ->
-  interp_sec e se_actual = Public.
-Proof.
-  intros e se_actual se_static Hsub Hpub.
-  destruct (interp_sec e se_actual) eqn:Hactual; auto.
-  pose proof (interp_sec_secret_monotone e se_actual se_static Hsub Hactual).
-  congruence.
-Qed.
-
-Lemma cmov_level_public_under_sub : forall cond e1 e2 se_actual se_static,
-  sec_env_sub se_actual se_static ->
-  join_sec (interp_sec cond se_static)
-    (join_sec (interp_sec e1 se_static) (interp_sec e2 se_static)) = Public ->
-  join_sec (interp_sec cond se_actual)
-    (join_sec (interp_sec e1 se_actual) (interp_sec e2 se_actual)) = Public.
-Proof.
-  intros cond e1 e2 se_actual se_static Hsub Hpub.
-  destruct (join_sec (interp_sec cond se_actual)
-    (join_sec (interp_sec e1 se_actual) (interp_sec e2 se_actual))) eqn:Hactual; auto.
-  pose proof (cmov_level_secret_monotone cond e1 e2 se_actual se_static Hsub Hactual).
-  congruence.
-Qed.
-
-
-Lemma interp_sec_lookup_agree : forall e se1 se2,
-  (forall x, sec_lookup se1 x = sec_lookup se2 x) ->
-  interp_sec e se1 = interp_sec e se2.
-Proof.
-  induction e; intros se1 se2 Hagree; cbn.
-  - reflexivity.
-  - apply Hagree.
-  - rewrite (IHe1 se1 se2 Hagree), (IHe2 se1 se2 Hagree).
-    reflexivity.
-Qed.
-
-Lemma sec_lookup_update_agree : forall se1 se2 x level1 level2,
-  (forall y, sec_lookup se1 y = sec_lookup se2 y) ->
-  level1 = level2 ->
-  forall y, sec_lookup (update_sec se1 x level1) y = sec_lookup (update_sec se2 x level2) y.
-Proof.
-  intros se1 se2 x level1 level2 Hagree Hlevel y.
-  subst level2.
-  destruct (x ==v y).
-  - subst. rewrite lookup_update_sec_eq. rewrite lookup_update_sec_eq. reflexivity.
-  - repeat rewrite lookup_update_sec_ne by congruence.
-    apply Hagree.
-Qed.
-
 Definition opt_safe_dse_core (pgm: program) (secrets: sec_env) : program :=
   (safe_dse_helper (cmd_of pgm) (protected_out pgm secrets) secrets,
    output_of pgm).
 
 (** * 3. Secret preservation (eval_sec) *)
 
-
-Lemma sec_lookup_update_public_id : forall se x,
-  sec_lookup se x = Public ->
-  forall y, sec_lookup (update_sec se x Public) y = sec_lookup se y.
-Proof.
-  intros se x Hpub y.
-  destruct (x ==v y).
-  - subst. rewrite lookup_update_sec_eq. symmetry. exact Hpub.
-  - rewrite lookup_update_sec_ne by congruence. reflexivity.
-Qed.
 
 Lemma agree_on_protected_out_implies_agree_on_secret : forall phi ctx c out ctx' v_opt,
   eval_sec phi ctx c ctx' ->

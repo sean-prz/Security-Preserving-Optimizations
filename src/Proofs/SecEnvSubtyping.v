@@ -3,8 +3,8 @@ Require Import VarSets.
 Require Import Language.Main.
 Require Import Language.Analysis.
 Require Import Language.Optimizations.Safe.DSE.
-Require Import Proofs.SecEnvProofs.
-Require Import Proofs.SecurityProofs.
+Require Import Proofs.SecLookup.
+Require Import Proofs.Noninference.
 
 
 Definition sec_env_sub (se1 se2 : sec_env) : Prop :=
@@ -24,26 +24,6 @@ Lemma sec_env_sub_trans : forall se1 se2 se3,
 Proof.
   unfold sec_env_sub. intros se1 se2 se3 H12 H23 x Hx.
   apply H23, H12, Hx.
-Qed.
-
-Lemma secret_lookup_in : forall se x,
-  sec_lookup se x = Secret ->
-  VarSet.In x se.
-Proof.
-  intros se x Hsecret.
-  apply mem_lookup_simpl_2 in Hsecret.
-  apply VarSet.mem_spec.
-  exact Hsecret.
-Qed.
-
-Lemma secret_in_lookup : forall se x,
-  VarSet.In x se ->
-  sec_lookup se x = Secret.
-Proof.
-  intros se x Hin.
-  apply mem_lookup_simpl_2.
-  apply VarSet.mem_spec.
-  exact Hin.
 Qed.
 
 Lemma sec_env_sub_join_left : forall se1 se2,
@@ -139,6 +119,47 @@ Proof.
     rewrite Hcond'. reflexivity.
   - pose proof (interp_sec_secret_monotone cond se1 se2 Hsub Hcond) as Hcond'.
     rewrite Hcond'. reflexivity.
+Qed.
+
+(* ================================================================= *)
+(* Public-side duals: derive Public-in-actual from Public-in-static   *)
+(* under sec_env_sub se_actual se_static.                             *)
+(* ================================================================= *)
+
+Lemma sec_env_sub_public : forall se_actual se_static x,
+  sec_env_sub se_actual se_static ->
+  sec_lookup se_static x = Public ->
+  sec_lookup se_actual x = Public.
+Proof.
+  intros se_actual se_static x Hsub Hpub.
+  destruct (sec_lookup se_actual x) eqn:Hactual; auto.
+  pose proof (Hsub x Hactual).
+  congruence.
+Qed.
+
+Lemma interp_sec_public_under_sub : forall e se_actual se_static,
+  sec_env_sub se_actual se_static ->
+  interp_sec e se_static = Public ->
+  interp_sec e se_actual = Public.
+Proof.
+  intros e se_actual se_static Hsub Hpub.
+  destruct (interp_sec e se_actual) eqn:Hactual; auto.
+  pose proof (interp_sec_secret_monotone e se_actual se_static Hsub Hactual).
+  congruence.
+Qed.
+
+Lemma cmov_level_public_under_sub : forall cond e1 e2 se_actual se_static,
+  sec_env_sub se_actual se_static ->
+  join_sec (interp_sec cond se_static)
+    (join_sec (interp_sec e1 se_static) (interp_sec e2 se_static)) = Public ->
+  join_sec (interp_sec cond se_actual)
+    (join_sec (interp_sec e1 se_actual) (interp_sec e2 se_actual)) = Public.
+Proof.
+  intros cond e1 e2 se_actual se_static Hsub Hpub.
+  destruct (join_sec (interp_sec cond se_actual)
+    (join_sec (interp_sec e1 se_actual) (interp_sec e2 se_actual))) eqn:Hactual; auto.
+  pose proof (cmov_level_secret_monotone cond e1 e2 se_actual se_static Hsub Hactual).
+  congruence.
 Qed.
 
 Lemma sec_post_monotone : forall c se1 se2,

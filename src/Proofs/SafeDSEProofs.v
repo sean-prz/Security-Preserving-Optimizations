@@ -3,6 +3,7 @@ Require Import VarSets.
 Require Import Language.Main.
 Require Import Language.Analysis.
 Require Import Language.Optimizations.Safe.DSE.
+Require Import Proofs.VarSetAgreement.
 Require Import Proofs.UnsafeDSEProofs.
 Require Import Proofs.UnskipProofs.
 

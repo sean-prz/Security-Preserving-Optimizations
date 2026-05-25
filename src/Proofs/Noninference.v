@@ -1,28 +1,8 @@
 Require Import Map.
 Require Import VarSets.
 Require Import Language.Main.
-Require Import Proofs.SecEnvProofs.
+Require Import Proofs.SecLookup.
 From Stdlib Require Import Program.Equality.
-
-
-Lemma pub_not_sec : forall se s,
-sec_lookup se s = Public <-> ~ VarSets.VarSet.In s se.
-Proof.
-  intros.
-  split.
-  - intro.
-    intro.
-    unfold sec_lookup in H.
-    rewrite <- VarSet.mem_spec in H0.
-    rewrite H0 in H.
-    discriminate.
-  - intro.
-    unfold sec_lookup.
-    rewrite <- VarSet.mem_spec in H.
-    apply Bool.not_true_is_false in H.
-    rewrite H.
-    reflexivity.
-Qed.
 
 
 (* If two valuations agree on public data, then the interpretation of any public
@@ -88,17 +68,6 @@ Proof.
   exact Hpub.
 Qed.
 
-Lemma update_skip_ne : forall x y se level,
-  x <> y ->
-  VarSet.mem y (update_sec se x level) =
-   VarSet.mem y se.
-Proof.
-  intros.
-  destruct level; simpl.
-  1: rewrite VarSetEqProps.remove_mem_2 by congruence. reflexivity.
-  1: rewrite VarSetEqProps.add_mem_2 by congruence. reflexivity.
-Qed.
-
 Lemma cmov_non_inference : forall phi se x cond e1 e2 level,
   join_sec (interp_sec cond se) (join_sec (interp_sec e1 se) (interp_sec e2 se)) = level ->
   non_inference phi se (Cmov x cond e1 e2) (update_sec se x level).
@@ -123,7 +92,7 @@ Proof.
     try (assert (Hcond_val: interp_arith cond v1 = interp_arith cond v2) by (eapply interp_sec_public_agree; eauto); congruence)
   | destruct (x ==v param); [ congruence | ];
     autorewrite with core in *; apply Hagree;
-    rewrite <- VarSet.mem_spec in *; rewrite update_skip_ne in Hparam; auto ].
+    rewrite <- VarSet.mem_spec in *; rewrite simplify_update_ne in Hparam; auto ].
 Qed.
 
 
@@ -308,27 +277,6 @@ Definition agree_on_public_sec_ctx (se_static : sec_env) (ctx1 ctx2 : sec_contex
   (forall x, sec_lookup se_static x = Public -> 
              sec_lookup (sec_of ctx1) x = sec_lookup (sec_of ctx2) x).
 
-(* If two dynamic environments agree on statically public variables, then they
-   will compute the exact same dynamic label for any statically public
-   expression. *)
-Lemma interp_sec_dynamic_agree : forall e se se_dyn1 se_dyn2,
-  (forall x, sec_lookup se x = Public -> sec_lookup se_dyn1 x = sec_lookup se_dyn2 x) ->
-  interp_sec e se = Public ->
-  interp_sec e se_dyn1 = interp_sec e se_dyn2.
-Proof.
-  induction e; intros se se_dyn1 se_dyn2 Hagree Hpub; cbn in *.
-  - (* Const *) reflexivity.
-  - (* Var *) apply Hagree. exact Hpub.
-  - (* Binop *)
-    destruct (interp_sec e1 se) eqn:He1;
-    destruct (interp_sec e2 se) eqn:He2;
-    cbn in Hpub; try discriminate.
-    rewrite (IHe1 se se_dyn1 se_dyn2 Hagree He1).
-    rewrite (IHe2 se se_dyn1 se_dyn2 Hagree He2).
-    reflexivity.
-Qed.
-
-
 Definition non_inference_sec (phi: function_env) (se_static: sec_env) (c: cmd) (se_static_out: sec_env) : Prop :=
   forall ctx1_in ctx2_in ctx1_out ctx2_out,
     (* If the initial contexts agree on public data and labels... *)
@@ -458,77 +406,6 @@ Proof.
       split.
       * cbn. rewrite Htrace_in. reflexivity.
       * exact Hagree_inv.
-Qed.
-
-Lemma simplify_update_ne : forall x y se level,
-  y <> x ->
-  VarSet.mem y (update_sec se x level) 
-  = VarSet.mem y se.
-Proof.
-  intros.
-  unfold update_sec. destruct level.
-  - apply VarSetEqProps.remove_mem_2; congruence.
-  - apply VarSetEqProps.add_mem_2; congruence.
-Qed.
-
-Lemma mem_update_ne : forall se x y level,
-  y <> x ->
-  sec_lookup (update_sec se y level) x = Public ->
-  VarSet.mem x se = false.
-Proof.
-  unfold sec_lookup.
-  intros.
-  destruct level; simpl in H0.
-  1: rewrite VarSetEqProps.remove_mem_2 in H0 by assumption.
-  2: rewrite VarSetEqProps.add_mem_2 in H0 by assumption.
-  all: destruct (VarSet.mem x se); congruence.
-Qed.
-
-Lemma mem_lookup_simpl_1 : forall se x,
-  sec_lookup se x = Public
-  <->
-  VarSet.mem x se = false.
-Proof.
-  unfold sec_lookup.
-  split; simpl; intros.
-  - destruct (VarSet.mem x se); congruence.
-  - rewrite H. reflexivity.
-Qed.
-
-
-Lemma mem_lookup_simpl_2 : forall se x,
-  sec_lookup se x = Secret
-  <->
-  VarSet.mem x se = true.
-Proof.
-  unfold sec_lookup.
-  split; simpl; intros.
-  - destruct (VarSet.mem x se); congruence.
-  - rewrite H. reflexivity.
-Qed.
-
-Lemma mem_update_eq : forall se x level,
-  sec_lookup (update_sec se x level) x = Public <->
-  level = Public.
-Proof.
-  unfold sec_lookup.
-  split;
-  intros.
-  destruct level; simpl in H.
-  reflexivity.
-  rewrite VarSetEqProps.add_mem_1 in H. discriminate.
-  subst.
-  simpl.
-  rewrite VarSetEqProps.remove_mem_1. reflexivity.
-Qed.
-
-Lemma mem_lookup_eq: forall se1 se2 x level,
-  sec_lookup (update_sec se1 x level) x = sec_lookup (update_sec se2 x level) x.
-Proof.
-  intros.
-  unfold update_sec, sec_lookup. destruct level.
-  - repeat rewrite VarSetEqProps.remove_mem_1; reflexivity.
-  - repeat rewrite VarSetEqProps.add_mem_1; reflexivity.
 Qed.
 
 Lemma cmov_non_inference_sec : forall phi se x cond e1 e2 level,
