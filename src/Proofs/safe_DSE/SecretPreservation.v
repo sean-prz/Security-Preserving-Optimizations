@@ -4,7 +4,6 @@ Require Import Language.Main.
 Require Import Language.Analysis.
 Require Import Language.Optimizations.Safe.DSE.
 Require Import Proofs.Analysis.LivenessProofs.
-Require Import Proofs.safe_DSE.Defs.
 Require Import Proofs.VarSetAgreement.
 Require Import Proofs.SecLookup.
 Require Import Proofs.SecEnvSubtyping.
