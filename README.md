@@ -1,38 +1,85 @@
-# itp-project
+# Security-Preserving Optimizations
 
+This repository presents a Rocq formalization designed to verify compiler
+optimizations that preserve both functional behavior and security properties.
+The project extends a Software Foundations-style IMP language with traces,
+secret/public state predicates, liveness analysis, and optimization passes for
+dead-store elimination and `skip` cleanup.
+
+The two main security goals are:
+
+- preserving deliberate sensitive-memory clears, so an optimizer cannot remove
+  security-relevant assignments only because they are functionally dead;
+- preserving non-inference-style constant-time behavior, so observable traces
+  remain independent of secret inputs.
+
+## Build
+
+The main entrypoint is:
+
+```sh
+make rocq
+```
+
+## Codebase Structure
 
 ```text
 src/
 ├── Map.v
+├── VarSets.v
 ├── Language/
 │   ├── Syntax.v
-│   ├── Semantics.v
 │   ├── Security.v
-│   └── Main.v
-├── optimizations/
-├── proofs/
-└── examples/
+│   ├── EvalContext.v
+│   ├── Analysis.v
+│   ├── Semantics.v
+│   ├── Properties.v
+│   ├── Main.v
+│   └── Optimizations/
+│       ├── Safe/
+│       │   ├── DSE.v
+│       │   └── Unskip.v
+│       └── Unsafe/
+│           └── DSE.v
+├── Proofs/
+│   ├── Analysis/
+│   ├── safe_DSE/
+│   ├── unsafe_DSE/
+│   └── unskip/
+└── Examples/
 ```
-```
-Map → VarSets → Syntax → Security (+ interp_sec -  needs Syntax + Security types)
-                              └─→ EvalContext.v (contexts, trace_event, notations)
-                                       └─→ Semantics (eval, eval_sec)
-                                                └─→ Properties (ct_cmd, security props)
-                                                         └─→ Main.v (re-exports all above)
-                         └─→ Analysis.v (program, liveness  - needs Syntax + VarSets)
-                                  └─ ├─→ Optimizations/Unsafe/DSE.v
-                                           └─→ Optimizations/Safe/DSE.v
-                                  └─→ Examples/, Proofs/ (import Language.Main + Language.Analysis)
-```
 
-notes CCP:
-scope: petit language, petit set de propriétés. coeur du projet (estimer moitié du temps proj) + stretch goals (rendre language + complexe, propriétés + complexes)
-ex. imp. -> .
+### Core Language
 
-checker que constant time reste, par rapport aux inputs.
-autres props
+- `src/Map.v` defines the finite-map interface and implementation.
+- `src/VarSets.v` defines finite sets of variables used by analysis and proofs.
+- `src/Language/Syntax.v` defines variables, expressions, commands, notation,
+  and function environments.
+- `src/Language/Security.v` defines security environments and secret/public
+  agreement predicates.
+- `src/Language/EvalContext.v` defines evaluation contexts and trace events.
+- `src/Language/Semantics.v` defines the big-step semantics.
+- `src/Language/Properties.v` defines semantic and security properties.
+- `src/Language/Main.v` re-exports the main language modules.
 
+### Optimizations
 
-jasmin https://arxiv.org/pdf/2511.11292
+- `src/Language/Optimizations/Unsafe/DSE.v` implements a baseline dead-store
+  elimination pass that is useful for showing what can go wrong.
+- `src/Language/Optimizations/Safe/DSE.v` implements the security-aware DSE
+  pass.
+- `src/Language/Optimizations/Safe/Unskip.v` removes redundant `skip`
+  commands while preserving the relevant properties.
 
+### Proofs And Examples
 
+- `src/Proofs/` contains the proof development for semantic equivalence,
+  non-inference, security environment reasoning, liveness analysis, safe DSE,
+  unsafe DSE, and `unskip`.
+- `src/Examples/` contains executable examples and checks for traces, program
+  safety, DSE behavior, and security units.
+
+## Report
+
+The project report is available at
+[`Report/6 - Security-Preserving Optimizations.pdf`](Report/6%20-%20Security-Preserving%20Optimizations.pdf).
