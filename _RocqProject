@@ -32,4 +32,3 @@ src/Examples/SimpleDSE.v
 src/Examples/SafeDSEChecks.v
 src/Examples/SimpleTraces.v
 src/Examples/ProgramSafety.v
-src/Unused/OtherOptims.v
