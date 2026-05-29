@@ -4,7 +4,7 @@ This repository presents a Rocq formalization designed to verify compiler
 optimizations that preserve both functional behavior and security properties.
 The project extends a Software Foundations-style IMP language with traces,
 secret/public state predicates, liveness analysis, and optimization passes for
-dead-store elimination and `skip` cleanup.
+dead-store elimination and `Skip` cleanup.
 
 The two main security goals are:
 
@@ -52,7 +52,7 @@ src/
 ### Core Language
 
 - `src/Map.v` defines the finite-map interface and implementation.
-- `src/VarSets.v` defines finite sets of variables used by analysis and proofs.
+- `src/VarSets.v` defines finite sets of variables used by analysis and proofs. ([MSetWeakLists](https://rocq-prover.org/doc/v8.9/stdlib/Coq.MSets.MSetWeakList.html)
 - `src/Language/Syntax.v` defines variables, expressions, commands, notation,
   and function environments.
 - `src/Language/Security.v` defines security environments and secret/public
@@ -68,7 +68,7 @@ src/
   elimination pass that is useful for showing what can go wrong.
 - `src/Language/Optimizations/Safe/DSE.v` implements the security-aware DSE
   pass.
-- `src/Language/Optimizations/Safe/Unskip.v` removes redundant `skip`
+- `src/Language/Optimizations/Safe/Unskip.v` removes redundant `Skip`
   commands while preserving the relevant properties.
 
 ### Proofs And Examples
