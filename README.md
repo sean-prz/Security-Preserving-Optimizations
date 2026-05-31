@@ -39,12 +39,12 @@ src/
 │       ├── Secure/
 │       │   ├── DSE.v
 │       │   └── Unskip.v
-│       └── Unsecure/
+│       └── Insecure/
 │           └── DSE.v
 ├── Proofs/
 │   ├── Analysis/
 │   ├── secure_DSE/
-│   ├── unsecure_DSE/
+│   ├── insecure_DSE/
 │   └── unskip/
 └── Examples/
 ```
@@ -64,7 +64,7 @@ src/
 
 ### Optimizations
 
-- `src/Language/Optimizations/Unsecure/DSE.v` implements a baseline dead-store
+- `src/Language/Optimizations/Insecure/DSE.v` implements a baseline dead-store
   elimination pass that is useful for showing what can go wrong.
 - `src/Language/Optimizations/Secure/DSE.v` implements the security-aware DSE
   pass.
@@ -75,7 +75,7 @@ src/
 
 - `src/Proofs/` contains the proof development for semantic equivalence,
   non-interference, security environment reasoning, liveness analysis, secure DSE,
-  unsecure DSE, and `unskip`.
+  insecure DSE, and `unskip`.
 - `src/Examples/` contains executable examples and checks for traces, program
   security, DSE behavior, and security units.
 

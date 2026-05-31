@@ -2,7 +2,7 @@ Require Import Map.
 Require Import VarSets.
 Require Import Language.Main.
 Require Import Language.Analysis.
-Require Import Language.Optimizations.Unsecure.DSE.
+Require Import Language.Optimizations.Insecure.DSE.
 Require Import Language.Optimizations.Secure.Unskip.
 Require Import Proofs.Analysis.LivenessProofs.
 Require Import Proofs.unskip.Soundness.
@@ -124,7 +124,7 @@ Hint Constructors eval eval_trace eval_sec : eval_db.
 
 (*
   This theorem lifts the command-level lemma to whole programs.
-  First, `dse_helper_sound` shows that unsecure DSE preserves the program outputs.
+  First, `dse_helper_sound` shows that insecure DSE preserves the program outputs.
   Then `opt_unskip_sound` removes any administrative `Skip`s introduced by the
   optimizer, without changing the resulting evaluation.
 *)

@@ -3,7 +3,7 @@ Require Import Language.Optimizations.Secure.DSE.
 Require Import Language.Optimizations.Secure.Unskip.
 Require Import Proofs.secure_DSE.SecretPreservation.
 Require Import Proofs.secure_DSE.Soundness.
-Require Import Proofs.secure_DSE.Noninterference.
+Require Import Proofs.secure_DSE.NonInterference.
 Require Import Proofs.unskip.Core.
 
 

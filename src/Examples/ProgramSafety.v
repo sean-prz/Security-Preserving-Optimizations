@@ -3,14 +3,15 @@ Require Import Language.Semantics.
 Require Import Map.
 Require Import VarSets.
 Require Import Language.Main.
-Require Import Language.Optimizations.Unsecure.DSE.
-Require Import Proofs.Noninterference.
+Require Import Language.Optimizations.Insecure.DSE.
+Require Import Proofs.NonInterference.
+
 
 From Stdlib Require Import Lia.
 
 Print secret_guard_program.
 
-Example unsecure1 := single_out_pgm secret_guard_program "x".
+Example insecure1 := single_out_pgm secret_guard_program "x".
 
 Example senv := senv_mk1 "secret" Secret.
 
@@ -18,11 +19,11 @@ Example v1 := $0 $+ ("secret", 1).
 Example v2 := $0 $+ ("secret", 0).
 
 
-Goal ~ (is_secure_pgm unsecure1 senv).
+Goal ~ (is_secure_pgm insecure1 senv).
 Proof.  
     intros H.
     destruct H as [? Hct].
-    unfold non_interference, unsecure1 in Hct; simpl in Hct.
+    unfold non_interference, insecure1 in Hct; simpl in Hct.
     specialize (Hct v1 v2 nil (v1 $+ ("x",1)) (v2 $+ ("x", 0)) (cons (Branch true)  nil) (cons (Branch false) nil)).
     assert (Hpre1 :  agree_on_public senv v1 v2).
     {

@@ -2,7 +2,7 @@ Require Import Map.
 Require Import VarSets.
 Require Import Language.Main.
 Require Import Proofs.SecLookup.
-Require Import Proofs.Noninterference.
+Require Import Proofs.NonInterference.
 From Stdlib Require Import Program.Equality.
 
 
