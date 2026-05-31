@@ -201,7 +201,7 @@ Qed.
    helper on the protected output set, then remove administrative `Skip`s via
    the `unskip` soundness theorem, and finally restrict the resulting agreement
    back to the original program outputs. *)
-Lemma opt_secure_DSE_sound : forall pgm secrets v v',
+Theorem opt_secure_DSE_sound : forall pgm secrets v v',
   eval v (cmd_of pgm) v' ->
   exists v_opt,
     eval v (cmd_of (opt_secure_DSE pgm secrets)) v_opt /\
