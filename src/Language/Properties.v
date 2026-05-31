@@ -105,8 +105,7 @@ Definition opt_keeps_secrets_secret (opt : program -> sec_env -> program) : Prop
     forall x, sec_lookup (sec_of sctx') x = sec_lookup (sec_of sctx'') x /\
     agree_on_secret (sec_of sctx') (sec_val_of sctx') (sec_val_of sctx'').
 
-(* TODO explain better this*)
-(* very weak soundness condition, ignoring soundness of the opti in terms of correct output values, this lemma is only here to produce the intermeidate sctx for the proof of composition . *) 
+(* Optimized program can evaluate if original program can. *)
 Definition opt_eval_sec_sound (opt : program -> sec_env -> program) : Prop :=
   forall sctx sctx' pgm,
     eval_sec sctx (cmd_of pgm) sctx' ->

@@ -200,7 +200,7 @@ Proof.
 Qed.
 
 (* A program that is constant time according to our definition should satisfy
-non-interference_sec. TODO clean this proof *) 
+non-interference_sec. *)
 Theorem ct_cmd_soundness_sec : forall se c se_out,
   ct_cmd se c se_out ->
   non_interference_sec se c se_out.
@@ -278,29 +278,22 @@ Proof.
 
     invert_evals_sec.
 
-    + (* Case 1: True / True *)
+    + (* Case 1: Both branches are True *)
       (* Traces append the branch decision *)
       assert (Htrace_branched: sec_trace_of (ctx1_in st++ Branch true) = sec_trace_of (ctx2_in st++ Branch true))
         by (cbn; rewrite Htrace; reflexivity).
-
       (* Explicitly prove branched agreement *)
       assert (Hagree_branched: agree_on_public_sec_ctx se (ctx1_in st++ Branch true) (ctx2_in st++ Branch true))
         by exact Hagree.
 
       (* Force Coq to use the branched contexts instead of guessing *)
       edestruct (IHHct1 (ctx1_in st++ Branch true) (ctx2_in st++ Branch true) ctx1_out ctx2_out) as [Htrace_thn Hagree_thn]; eauto.
-
       split; [exact Htrace_thn |].
-
       eapply agree_on_public_sec_ctx_join_thn; eauto.
-
-    + (* Case 2: True / False (Contradiction) *)
+    + (* Case 2 and 3: branches dont match *)
       cbn in *. congruence.
-
-    + (* Case 3: False / True (Contradiction) *)
-      cbn in *. congruence.
-
-    + (* Case 4: False / False *)
+    +  cbn in *. congruence.
+    + (* Case 4: Botht branches are False *)
       assert (Htrace_branched: sec_trace_of (ctx1_in st++ Branch false) = sec_trace_of (ctx2_in st++ Branch false))
         by (cbn; rewrite Htrace; reflexivity).
 
@@ -337,7 +330,6 @@ This program is even a bit tricking the system. By not defining "y" in the secon
 We didn't formalize further this notion of difference between non_interference and non_interference_sec, but we found interesting to display where it didn't match. This point could point to a flaw in our system, inducing that we might need to declare all variables that we used (= undeclared vars are illegal)
 *)
 
-(*TODO please check this*)
 Definition interferent_example : cmd := Assign "x" (Var "y" - Var "y")%expr.
 
 Definition se_sample     : sec_env := senv_mk1 "y" Secret.
